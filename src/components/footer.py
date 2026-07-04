@@ -4,7 +4,7 @@ import streamlit as st
 def footer_home():
     
     st.markdown(f"""
-        <div style="margin-top:2rem; display:flex; gap:6px; justify-content:center; items-align:center">
+        <div style="margin-top:2rem; display:flex; gap:6px; justify-content:center; align-items:center">
         <p style="font-weight:bold; color:white;"> Created by Shravan Mole </p>  
         </div>
                 
@@ -14,7 +14,7 @@ def footer_home():
 def footer_dashboard():
     
     st.markdown(f"""
-        <div style="margin-top:2rem; display:flex; gap:6px; justify-content:center; items-align:center">
+        <div style="margin-top:2rem; display:flex; gap:6px; justify-content:center; align-items:center">
         <p style="font-weight:bold; color:black;"> Created by Shravan Mole </p>  
         </div>
                 
