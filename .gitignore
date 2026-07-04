@@ -103,6 +103,10 @@ ipython_config.py
 # virtualenv
 venv/
 .venv/
+.streamlit/
+dist/
+*. pyc
+• DS_Store
 env/
 ENV/
 env.bak/

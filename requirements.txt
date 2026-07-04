@@ -15,5 +15,4 @@ bcrypt
 # QR code generation
 segno 
 pillow
-
 streamlit
