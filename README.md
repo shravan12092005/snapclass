@@ -55,10 +55,10 @@ By leveraging a serverless database (Supabase), high-precision feature extractor
 ![Home Screen](images/home.png)
 
 ### Student Dashboard
-![Student Portal](images/student_dashboard.png)
+![Student Dashboard](images/student_dashboard.png)
 
 ### Teacher Dashboard
-![Teacher Dashboard Placeholder](https://via.placeholder.com/800x450.png?text=Teacher+Dashboard+-+Attendance+Scanner+and+Course+Manager)
+![Teacher Dashboard](images/teacher_dashboard.png)
 
 ---
 
