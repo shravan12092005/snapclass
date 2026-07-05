@@ -254,7 +254,7 @@ Distributed under the MIT License. See `LICENSE` for more information.
 ## 👥 Author
 **Shravan Mole**
 *   **GitHub**: [@shravan12092005](https://github.com/shravan12092005)
-*   **LinkedIn**: [Shravan Mole](https://www.linkedin.com/in/shravan-mole/)
+*   **LinkedIn**: [Shravan Mole](https://www.linkedin.com/in/shravan-mole-930818378?utm_source=share_via&utm_content=profile&utm_medium=member_ios)
 *   **Email**: [shravanmole9383@gmail.com](mailto:shravanmole9383@gmail.com)
 
 ---
