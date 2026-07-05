@@ -22,7 +22,7 @@ def student_dashboard():
         header_dashboard()
     with c2:
         st.subheader(f"""Welcome, {student_data['name']} """)
-        if st.button("Logout", type='secondary', key='loginbackbtn', shortcut="control+backspace"):
+        if st.button("Logout", type='secondary', key='student_logout_btn', shortcut="control+backspace"):
             st.session_state['is_logged_in'] = False
             del st.session_state.student_data 
             st.rerun()
@@ -68,7 +68,7 @@ def student_dashboard():
         stats = stats_map.get(sid, {"total": 0, "attended": 0})
 
         def unenroll_button(s=sid, sn=sub['name']):
-            if st.button("Unenroll from this course", type='tertiary', width='stretch', icon=':material/delete_forever:'):
+            if st.button("Unenroll from this course", type='tertiary', width='stretch', icon=':material/delete_forever:', key=f"unenroll_{s}"):
                 unenroll_student_to_subject(student_id, s)
                 st.toast(f'Unenrolled from {sn} successfully!')
                 st.rerun()
@@ -103,7 +103,7 @@ def student_screen():
     with c1:
         header_dashboard()
     with c2:
-        if st.button("Go back to Home", type='secondary', key='loginbackbtn', shortcut="control+backspace"):
+        if st.button("Go back to Home", type='secondary', key='student_back_btn', shortcut="control+backspace"):
             st.session_state['login_type'] = None
             st.rerun()
 
