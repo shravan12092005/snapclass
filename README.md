@@ -7,12 +7,7 @@
 [![Scikit-Learn](https://img.shields.io/badge/Scikit--Learn-ML-F7931E?style=for-the-badge&logo=scikit-learn&logoColor=white)](https://scikit-learn.org/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
----
 
-<!-- Banner Image Here -->
-![SnapClass Banner Placeholder](https://via.placeholder.com/1000x300.png?text=SnapClass+AI-Powered+Smart+Attendance+Management)
-
----
 
 ## 📌 Project Description
 
