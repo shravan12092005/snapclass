@@ -308,7 +308,7 @@ def teacher_screen_login():
             st.session_state['login_type'] = None
             st.rerun()
 
-    st.markdown("<h2 style='text-align: center;'>Login using password</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align: center; color: #000000;'>Login using password</h2>", unsafe_allow_html=True)
     st.write("")
     st.write("")
 

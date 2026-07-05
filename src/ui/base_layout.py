@@ -16,6 +16,10 @@ def style_background_home():
                     padding:2.5rem !important;
                     border-radius: 5rem !important;
                     }
+
+                .stApp div[data-testid="stColumn"] h2 {
+                    color: #000000 !important;
+                }
         </style>  
 
                 """
@@ -106,6 +110,37 @@ def style_base_layout():
 
             button:hover{
                 transform :scale(1.05)}
+
+            /* Style Text Input Labels */
+            div[data-testid="stTextInput"] label, 
+            div[data-testid="stTextInput"] label p {
+                color: #000000 !important;
+            }
+
+            /* Style Text Input fields */
+            div[data-testid="stTextInput"] input {
+                background-color: #FFFFFF !important;
+                color: #000000 !important;
+                caret-color: #000000 !important; /* Cursor color */
+            }
+
+            /* Streamlit uses a div wrapper with data-baseweb="input" for the text input box */
+            div[data-testid="stTextInput"] div[data-baseweb="input"] {
+                background-color: #FFFFFF !important;
+                border: 1px solid #D1D5DB !important; /* Subtle light gray border */
+            }
+
+            /* Change placeholder text color to medium gray */
+            div[data-testid="stTextInput"] input::placeholder {
+                color: #6B7280 !important;
+            }
+
+            /* Style Camera Input Instruction Text */
+            div[data-testid="stCameraInput"] label, 
+            div[data-testid="stCameraInput"] label p, 
+            div[data-testid="stCameraInput"] p {
+                color: #000000 !important;
+            }
         </style>  
 
                 """
