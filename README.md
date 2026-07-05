@@ -52,10 +52,10 @@ By leveraging a serverless database (Supabase), high-precision feature extractor
 ## 🎨 Screenshots
 
 ### Home Screen
-![Home Screen Placeholder](https://via.placeholder.com/800x450.png?text=Home+Screen+-+Student+and+Teacher+Portals)
+![Home Screen](images/home.png)
 
 ### Student Dashboard
-![Student Dashboard Placeholder](https://via.placeholder.com/800x450.png?text=Student+Dashboard+-+FaceID+Login+and+Subject+List)
+![Student Portal](images/student_dashboard.png)
 
 ### Teacher Dashboard
 ![Teacher Dashboard Placeholder](https://via.placeholder.com/800x450.png?text=Teacher+Dashboard+-+Attendance+Scanner+and+Course+Manager)
