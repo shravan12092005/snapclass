@@ -9,6 +9,7 @@ from src.database.db import check_teacher_exists, create_teacher, teacher_login,
 from src.components.dialog_create_subject import create_subject_dialog
 from src.components.dialog_share_subject import share_subject_dialog
 from src.components.dialog_add_photo import add_photos_dialog
+from src.components.dialog_delete_subject import delete_subject_dialog
 
 from src.pipelines.face_pipeline import predict_attendance
 from src.components.dialog_attendance_results import attendance_result_dialog
@@ -220,9 +221,14 @@ def teacher_tab_manage_subjects():
                 ("🕰️", "Classes", sub['total_classes']),
             ]
 
-            def share_btn(s=sub):
-                if st.button(f"Share Code: {s['name']}", key=f"share_{s['subject_code']}", icon=":material/share:"):
-                    share_subject_dialog(s['name'], s['subject_code'])
+            def footer_actions(s=sub):
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    if st.button(f"Share Code: {s['name']}", key=f"share_{s['subject_code']}", icon=":material/share:", width="stretch"):
+                        share_subject_dialog(s['name'], s['subject_code'])
+                with col2:
+                    if st.button("Delete", key=f"delete_{s['subject_code']}", icon=":material/delete:", type="secondary", width="stretch"):
+                        delete_subject_dialog(s['name'], s['subject_id'])
                 st.write("")
 
             subject_card(
@@ -230,7 +236,7 @@ def teacher_tab_manage_subjects():
                 code=sub['subject_code'],
                 section=sub['section'],
                 stats=stats,
-                footer_callback=share_btn
+                footer_callback=footer_actions
             )
     else:
         st.info("NO SUBJECTS FOUND. CREATE ONE ABOVE")

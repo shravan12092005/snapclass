@@ -46,6 +46,7 @@ By leveraging a serverless database (Supabase), high-precision feature extractor
 *   **Course Linking and QR Codes**: Generates unique sharing links and QR codes via `segno` for WhatsApp/Email distribution.
 *   **Auto-Enrollment Handling**: Dynamic URL parameter listening (`?join-code=CS101`) to automatically enroll students upon logging in.
 *   **Unenroll Support**: Simple dashboard actions allowing students to leave subjects instantly.
+*   **Subject Deletion Support**: Clear Delete option for teachers with secure cascading removals of all related enrollments and logs.
 
 ---
 
@@ -82,24 +83,7 @@ By leveraging a serverless database (Supabase), high-precision feature extractor
 
 ## 📐 Project Architecture
 
-```mermaid
-graph TD
-    User[User] -->|Accesses app.py| Route{Portal Router}
-    Route -->|Teacher Path| TeacherLogin[Teacher Password Login]
-    Route -->|Student Path| StudentFaceID[Student FaceID Scan]
-    
-    StudentFaceID -->|Face Match| StudentDash[Student Dashboard]
-    StudentFaceID -->|No Match| FaceRegister[New Profile Face/Voice Registration]
-    FaceRegister -->|Inserts to DB| Supabase[Supabase Database]
-    
-    TeacherLogin -->|Authenticates| TeacherDash[Teacher Dashboard]
-    
-    TeacherDash -->|Take Attendance| FaceVoicePipeline[Face/Voice AI Recognition]
-    TeacherDash -->|Manage Courses| SubjectMgmt[Course & QR Code Generation]
-    
-    FaceVoicePipeline -->|Updates| Supabase
-    SubjectMgmt -->|Creates Subjects/Links| Supabase
-```
+![Project Architecture](images/architecture.png)
 
 ### Architectural Details
 1.  **Entry Point (`app.py`)**: Automatically captures route query variables (`?join-code=`) and handles session states.
