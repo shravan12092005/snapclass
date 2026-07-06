@@ -160,11 +160,11 @@ def style_base_layout():
                 margin-bottom:0rem !important;
             }
 
-            .snapclass-logo {
+            .stApp h2.snapclass-logo {
                 color: #5865F2 !important;
             }
 
-            .snapclass-logo-home {
+            .stApp h1.snapclass-logo-home {
                 color: #E0E3FF !important;
             }
                 
