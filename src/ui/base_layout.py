@@ -11,13 +11,26 @@ def style_background_home():
                     background: #5865F2 !important;
                 }
 
+                /* Force text directly on Home page background to be white */
+                .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp p, .stApp span, .stApp label {
+                    color: #FFFFFF !important;
+                }
+
                 .stApp div[data-testid="stColumn"]{
                     background-color:#E0E3FF !important;
                     padding:2.5rem !important;
                     border-radius: 5rem !important;
                     }
 
-                .stApp div[data-testid="stColumn"] h2 {
+                /* Force all text inside card columns to be black */
+                .stApp div[data-testid="stColumn"] h1,
+                .stApp div[data-testid="stColumn"] h2,
+                .stApp div[data-testid="stColumn"] h3,
+                .stApp div[data-testid="stColumn"] h4,
+                .stApp div[data-testid="stColumn"] p,
+                .stApp div[data-testid="stColumn"] span,
+                .stApp div[data-testid="stColumn"] li,
+                .stApp div[data-testid="stColumn"] label {
                     color: #000000 !important;
                 }
         </style>  
@@ -33,6 +46,85 @@ def style_background_dashboard():
 
                 .stApp {
                     background: #E0E3FF !important;
+                }
+
+                /* Force all dashboard text to be black/dark */
+                .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6, 
+                .stApp p, .stApp li, .stApp label {
+                    color: #000000 !important;
+                }
+
+                /* Target markdown container text */
+                div[data-testid="stMarkdownContainer"] p,
+                div[data-testid="stMarkdownContainer"] span {
+                    color: #000000 !important;
+                }
+
+                /* Force selectbox background to white and text to black */
+                div[data-testid="stSelectbox"] div[data-baseweb="select"],
+                div[data-testid="stSelectbox"] div[role="combobox"] {
+                    background-color: #FFFFFF !important;
+                    border: 1px solid #D1D5DB !important;
+                    border-radius: 0.5rem !important;
+                }
+
+                div[data-testid="stSelectbox"] label,
+                div[data-testid="stSelectbox"] label p,
+                div[data-testid="stSelectbox"] p,
+                div[data-testid="stSelectbox"] div[role="combobox"] span {
+                    color: #000000 !important;
+                }
+
+                /* Ensure radio buttons label/texts are black */
+                div[data-testid="stRadio"] label,
+                div[data-testid="stRadio"] label p,
+                div[data-testid="stRadio"] p {
+                    color: #000000 !important;
+                }
+
+                /* Ensure checkbox text is black */
+                div[data-testid="stCheckbox"] label,
+                div[data-testid="stCheckbox"] label p {
+                    color: #000000 !important;
+                }
+
+                /* Expander titles */
+                div[data-testid="stExpander"] summary,
+                div[data-testid="stExpander"] summary p {
+                    color: #000000 !important;
+                }
+
+                /* Tab headers */
+                button[data-baseweb="tab"] p {
+                    color: #000000 !important;
+                }
+                button[data-baseweb="tab"] {
+                    color: #000000 !important;
+                }
+
+                /* File Uploader labels */
+                div[data-testid="stFileUploader"] label,
+                div[data-testid="stFileUploader"] label p,
+                div[data-testid="stFileUploader"] p,
+                div[data-testid="stFileUploader"] span {
+                    color: #000000 !important;
+                }
+
+                /* Notification messages (st.info, warning, success) */
+                div[data-testid="stNotification"] p,
+                div[data-testid="stNotification"] span {
+                    color: #000000 !important;
+                }
+
+                /* Streamlit dialog modals background and text color */
+                div[role="dialog"],
+                div[data-baseweb="modal"] {
+                    background-color: #E0E3FF !important;
+                }
+                div[role="dialog"] h1, div[role="dialog"] h2, div[role="dialog"] h3, 
+                div[role="dialog"] h4, div[role="dialog"] p, div[role="dialog"] span, 
+                div[role="dialog"] label, div[role="dialog"] li {
+                    color: #000000 !important;
                 }
 
         </style>  
@@ -107,6 +199,13 @@ def style_base_layout():
                 border: none !important;
                 transition: transform 0.25s ease-in-out !important;
                 }
+
+            /* Lock button label text colors to white */
+            button p, 
+            button span, 
+            button div {
+                color: #FFFFFF !important;
+            }
 
             button:hover{
                 transform :scale(1.05)}
