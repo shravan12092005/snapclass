@@ -159,14 +159,6 @@ def style_base_layout():
                 line-height:0.9 !important;
                 margin-bottom:0rem !important;
             }
-
-            .stApp h2.snapclass-logo {
-                color: #5865F2 !important;
-            }
-
-            .stApp h1.snapclass-logo-home {
-                color: #E0E3FF !important;
-            }
                 
             h3, h4, p {
                 font-family: 'Outfit', sans-serif;    
