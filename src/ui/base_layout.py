@@ -201,10 +201,32 @@ def style_base_layout():
                 }
 
             /* Lock button label text colors to white */
-            button p, 
-            button span, 
-            button div {
+            .stApp button p, 
+            .stApp button span, 
+            .stApp button div,
+            div[role="dialog"] button p,
+            div[role="dialog"] button span,
+            div[role="dialog"] button div,
+            div[data-baseweb="modal"] button p,
+            div[data-baseweb="modal"] button span,
+            div[data-baseweb="modal"] button div {
                 color: #FFFFFF !important;
+            }
+
+            /* Lock selectbox dropdown list styles to light theme colors */
+            div[data-baseweb="popover"] ul,
+            div[data-baseweb="menu"] ul {
+                background-color: #FFFFFF !important;
+                border: 1px solid #D1D5DB !important;
+            }
+            div[data-baseweb="popover"] li,
+            div[data-baseweb="menu"] li {
+                color: #000000 !important;
+                background-color: #FFFFFF !important;
+            }
+            div[data-baseweb="popover"] li:hover,
+            div[data-baseweb="menu"] li:hover {
+                background-color: #F3F4F6 !important; /* light gray hover */
             }
 
             button:hover{
