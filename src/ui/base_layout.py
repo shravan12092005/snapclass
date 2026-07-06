@@ -51,18 +51,29 @@ def style_background_dashboard():
                     color: #000000 !important;
                 }
 
-                /* Force selectbox background to white and text to black */
+                /* Force selectbox background to white and text/icons to black */
                 div[data-testid="stSelectbox"] div[data-baseweb="select"],
-                div[data-testid="stSelectbox"] div[role="combobox"] {
+                div[data-testid="stSelectbox"] div[data-baseweb="select"] > div,
+                div[data-testid="stSelectbox"] div[role="combobox"],
+                div[data-testid="stSelectbox"] div[role="combobox"] > div {
                     background-color: #FFFFFF !important;
+                    color: #000000 !important;
                     border: 1px solid #D1D5DB !important;
                     border-radius: 0.5rem !important;
                 }
-
+                div[data-testid="stSelectbox"] div[data-baseweb="select"] span,
+                div[data-testid="stSelectbox"] div[role="combobox"] span,
+                div[data-testid="stSelectbox"] div[data-baseweb="select"] div,
+                div[data-testid="stSelectbox"] div[role="combobox"] div {
+                    color: #000000 !important;
+                }
+                div[data-testid="stSelectbox"] svg {
+                    fill: #000000 !important;
+                    color: #000000 !important;
+                }
                 div[data-testid="stSelectbox"] label,
                 div[data-testid="stSelectbox"] label p,
-                div[data-testid="stSelectbox"] p,
-                div[data-testid="stSelectbox"] div[role="combobox"] span {
+                div[data-testid="stSelectbox"] p {
                     color: #000000 !important;
                 }
 
