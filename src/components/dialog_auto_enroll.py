@@ -42,3 +42,4 @@ def auto_enroll_dialog(subject_code):
             time.sleep(2)
             st.rerun()
 
+
