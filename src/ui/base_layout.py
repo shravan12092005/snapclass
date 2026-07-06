@@ -13,9 +13,18 @@ def style_background_home():
                 }
 
                 .stApp div[data-testid="stColumn"]{
-                    background-color:#E0E3FF !important;
-                    padding:2.5rem !important;
-                    border-radius: 5rem !important;
+                    background-color: rgba(224, 227, 255, 0.95) !important;
+                    padding: 2.5rem !important;
+                    border-radius: 3rem !important;
+                    border: 1px solid rgba(255, 255, 255, 0.4) !important;
+                    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15) !important;
+                    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease !important;
+                }
+
+                .stApp div[data-testid="stColumn"]:hover {
+                    transform: translateY(-8px) scale(1.02) !important;
+                    box-shadow: 0 15px 45px 0 rgba(88, 101, 242, 0.45) !important;
+                    background-color: #FFFFFF !important;
                 }
 
                 /* Force all text inside card columns to be black */

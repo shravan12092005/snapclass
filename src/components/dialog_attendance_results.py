@@ -8,6 +8,24 @@ from src.database.db import create_attendance
 
 def show_attendance_result(df, logs):
     st.write('Please review attendance before confirming.')
+    
+    # Calculate stats
+    total_count = len(logs)
+    present_count = sum(1 for log in logs if log.get('is_present'))
+    absent_count = total_count - present_count
+    present_pct = (present_count / total_count * 100) if total_count > 0 else 0.0
+    
+    c_m1, c_m2, c_m3 = st.columns(3)
+    with c_m1:
+        st.metric("Total Students", total_count)
+    with c_m2:
+        st.metric("Present", present_count)
+    with c_m3:
+        st.metric("Absent", absent_count)
+        
+    st.progress(present_pct / 100.0)
+    st.write("")
+    
     st.dataframe(df, hide_index=True, width='stretch')
 
     col1, col2 = st.columns(2)

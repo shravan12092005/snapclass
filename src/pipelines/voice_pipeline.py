@@ -1,6 +1,7 @@
 import numpy as np 
 import io
 import streamlit as st
+from src.utils.logger import logger
 
 try:
     from resemblyzer import VoiceEncoder, preprocess_wav
@@ -30,7 +31,9 @@ def get_voice_embedding(audio_bytes):
         embedding = encoder.embed_utterance(wav)
         return embedding.tolist()
     except Exception as e:
-        st.error('Voice recog error')
+        import traceback
+        st.error(f"Voice recognition error: {str(e)}")
+        logger.error(f"Voice recognition exception:\n{traceback.format_exc()}")
         return None
     
 
@@ -41,10 +44,22 @@ def identify_speaker(new_embedding, candidates_dict, threshold=0.65):
     best_sid = None
     best_score = -1.0
 
+    # Explicitly L2-normalize the query embedding
+    new_emb_np = np.array(new_embedding)
+    new_norm = np.linalg.norm(new_emb_np)
+    if new_norm > 1e-8:
+        new_emb_np = new_emb_np / new_norm
+
     for sid, stored_embedding in candidates_dict.items():
         if stored_embedding:
-            similarity = np.dot(new_embedding, stored_embedding)
-            if similarity> best_score:
+            # Explicitly L2-normalize the stored candidate embedding
+            stored_emb_np = np.array(stored_embedding)
+            stored_norm = np.linalg.norm(stored_emb_np)
+            if stored_norm > 1e-8:
+                stored_emb_np = stored_emb_np / stored_norm
+
+            similarity = np.dot(new_emb_np, stored_emb_np)
+            if similarity > best_score:
                 best_score = similarity
                 best_sid = sid
 
@@ -85,5 +100,7 @@ def process_bulk_audio(audio_bytes, candidates_dict, threshold=0.65):
 
         return identified_results
     except Exception as e:
-        st.error('Bulk process error')
+        import traceback
+        st.error(f"Bulk audio processing error: {str(e)}")
+        logger.error(f"Bulk audio processing exception:\n{traceback.format_exc()}")
         return {}

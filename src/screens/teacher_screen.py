@@ -1,11 +1,12 @@
 import streamlit as st
+import time
 
 from src.ui.base_layout import style_background_dashboard, style_base_layout
 
 from src.components.header import header_dashboard
 from src.components.footer import footer_dashboard
 from src.components.subject_card import subject_card
-from src.database.db import check_teacher_exists, create_teacher, teacher_login, get_teacher_subjects, get_attendance_for_teacher
+from src.database.db import check_teacher_exists, create_teacher, teacher_login, get_teacher_subjects, get_attendance_for_teacher, safe_execute
 from src.components.dialog_create_subject import create_subject_dialog
 from src.components.dialog_share_subject import share_subject_dialog
 from src.components.dialog_add_photo import add_photos_dialog
@@ -15,7 +16,7 @@ from src.pipelines.face_pipeline import predict_attendance
 from src.components.dialog_attendance_results import attendance_result_dialog
 import numpy as np
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pandas as pd
 
@@ -119,6 +120,13 @@ def teacher_tab_take_attendance():
 
     selected_subject_id = subject_options[selected_subject_label]
 
+    # Automatically clear staged images when the subject changes to prevent carry-over
+    if 'prev_selected_subject_id' not in st.session_state:
+        st.session_state.prev_selected_subject_id = selected_subject_id
+    elif st.session_state.prev_selected_subject_id != selected_subject_id:
+        st.session_state.attendance_images = []
+        st.session_state.prev_selected_subject_id = selected_subject_id
+
     st.divider()
 
     if st.session_state.attendance_images:
@@ -154,7 +162,7 @@ def teacher_tab_take_attendance():
 
                             all_detected_ids.setdefault(student_id, []).append(f"Photo {idx+1}")
 
-                enrolled_res = supabase.table('subject_students').select("*, students(*)").eq('subject_id',selected_subject_id ).execute()
+                enrolled_res = safe_execute(supabase.table('subject_students').select("*, students(*)").eq('subject_id',selected_subject_id ))
                 enrolled_students = enrolled_res.data
 
                 if not enrolled_students:
@@ -185,7 +193,7 @@ def teacher_tab_take_attendance():
                             'is_present': bool(is_present)
                         })
 
-                attendance_result_dialog(pd.DataFrame(results), attendance_to_log)
+                    attendance_result_dialog(pd.DataFrame(results), attendance_to_log)
 
     with c3:
         if st.button('Use Voice Attendance', type='primary', width='stretch', icon=':material/mic:'):
@@ -268,7 +276,25 @@ def teacher_tab_attendance_records():
 
     df = pd.DataFrame(data)
 
+    if not df.empty:
+        col_dr1, col_dr2 = st.columns(2)
+        with col_dr1:
+            today = datetime.now().date()
+            thirty_days_ago = today - timedelta(days=30)
+            selected_range = st.date_input(
+                "Select Date Range",
+                value=(thirty_days_ago, today),
+                key="records_date_range"
+            )
 
+        if len(selected_range) == 2:
+            start_date, end_date = selected_range
+            df['Date_Obj'] = pd.to_datetime(df['ts_group']).dt.date
+            df = df[(df['Date_Obj'] >= start_date) & (df['Date_Obj'] <= end_date)]
+
+    if df.empty:
+        st.info("No attendance records found for the selected date range.")
+        return
 
     summary = (
         df.groupby(['ts_group', 'Time', 'Subject', 'Subject Code'])
@@ -283,6 +309,31 @@ def teacher_tab_attendance_records():
         "✅ " + summary['Present_Count'].astype(str) + " /"
         + summary['Total_Count'].astype(str) + ' Students'
     )
+
+    # Visual Trend Chart Section
+    subject_list = sorted(list(summary['Subject'].unique()))
+    if len(subject_list) > 0:
+        st.subheader("Attendance Trend Analysis")
+        selected_trend_subject = st.selectbox(
+            "Select Subject to View Trend Chart",
+            options=["All Subjects"] + subject_list,
+            key="trend_subject_selector"
+        )
+        
+        summary['Attendance Rate (%)'] = (summary['Present_Count'] / summary['Total_Count'] * 100).round(1)
+        chart_df = summary.sort_values(by='ts_group')
+        
+        if selected_trend_subject != "All Subjects":
+            chart_df = chart_df[chart_df['Subject'] == selected_trend_subject]
+            
+        if not chart_df.empty:
+            # Format dataframe index for visual line chart alignment
+            chart_data = chart_df.set_index('Time')[['Attendance Rate (%)']]
+            st.line_chart(chart_data)
+        else:
+            st.info("No data available for the selected subject trend.")
+
+    st.subheader("All Sessions Log")
 
     display_df = ( summary.sort_values(by='ts_group' ,ascending=False)
                   [['Time', 'Subject', 'Subject Code', 'Attendance Stats']]
@@ -331,7 +382,6 @@ def teacher_screen_login():
         if st.button('Login', icon=':material/passkey:', shortcut='control+enter', width='stretch'):
             if login_teacher(teacher_username, teacher_pass):
                 st.toast("welcome back!", icon="👋")
-                import time
                 time.sleep(1)
                 st.rerun()
             else:
@@ -352,6 +402,16 @@ def register_teacher(teacher_username, teacher_name, teacher_pass, teacher_pass_
         return False, "Username already taken"
     if teacher_pass != teacher_pass_confirm:
         return False, "Password doesn't match"
+        
+    # Enforce password strength checks
+    if len(teacher_pass) < 8:
+        return False, "Password must be at least 8 characters long!"
+    if not any(char.isdigit() for char in teacher_pass):
+        return False, "Password must contain at least one digit!"
+    if not any(char.isupper() for char in teacher_pass):
+        return False, "Password must contain at least one uppercase letter!"
+    if not any(char.islower() for char in teacher_pass):
+        return False, "Password must contain at least one lowercase letter!"
     
     try:
         create_teacher(teacher_username, teacher_pass, teacher_name)
@@ -394,7 +454,6 @@ def teacher_screen_register():
             success, message = register_teacher(teacher_username, teacher_name, teacher_pass, teacher_pass_confirm)
             if success:
                 st.success(message)
-                import time
                 time.sleep(2)
                 st.session_state.teacher_login_type = "login"
                 st.rerun()
