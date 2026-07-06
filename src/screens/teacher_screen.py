@@ -6,7 +6,7 @@ from src.ui.base_layout import style_background_dashboard, style_base_layout
 from src.components.header import header_dashboard
 from src.components.footer import footer_dashboard
 from src.components.subject_card import subject_card
-from src.database.db import check_teacher_exists, create_teacher, teacher_login, get_teacher_subjects, get_attendance_for_teacher, safe_execute
+from src.database.db import check_teacher_exists, create_teacher, teacher_login, get_teacher_subjects, get_attendance_for_teacher, safe_execute, unenroll_student_to_subject
 from src.components.dialog_create_subject import create_subject_dialog
 from src.components.dialog_share_subject import share_subject_dialog
 from src.components.dialog_add_photo import add_photos_dialog
@@ -246,6 +246,57 @@ def teacher_tab_manage_subjects():
                 stats=stats,
                 footer_callback=footer_actions
             )
+
+            # Roster Inspector expander below the card
+            with st.expander(f"👥 View Class Roster ({sub['total_students']} enrolled)", expanded=False):
+                with st.spinner("Fetching roster details..."):
+                    roster_res = safe_execute(supabase.table('subject_students').select("*, students(*)").eq('subject_id', sub['subject_id']))
+                    roster = roster_res.data if roster_res.data else []
+
+                if roster:
+                    roster_data = []
+                    for node in roster:
+                        student = node['students']
+                        sid = student['student_id']
+
+                        # Fetch student attendance metrics inside this subject
+                        att_res = safe_execute(supabase.table('attendance_logs').select('is_present').eq('student_id', sid).eq('subject_id', sub['subject_id']))
+                        att_logs = att_res.data if att_res.data else []
+
+                        total_days = len(att_logs)
+                        attended_days = sum(1 for log in att_logs if log['is_present'])
+                        rate = (attended_days / total_days * 100) if total_days > 0 else 0.0
+
+                        roster_data.append({
+                            "Name": student['name'],
+                            "ID": sid,
+                            "Attended": f"{attended_days}/{total_days} classes",
+                            "Rate": f"{rate:.1f}%"
+                        })
+
+                    roster_df = pd.DataFrame(roster_data)
+                    st.dataframe(roster_df, hide_index=True, use_container_width=True)
+
+                    # Remove enrollment selector
+                    st.write("")
+                    col_u1, col_u2 = st.columns([3, 1], vertical_alignment="bottom")
+                    with col_u1:
+                        # Build mapping dict: ID -> Name to keep selection names clean in UI
+                        student_map = {s['ID']: s['Name'] for s in roster_data}
+                        selected_sid = st.selectbox(
+                            "Select Student to Remove",
+                            options=list(student_map.keys()),
+                            format_func=lambda x: student_map[x],
+                            key=f"unenroll_sel_{sub['subject_id']}"
+                        )
+                    with col_u2:
+                        if st.button("Remove Student", key=f"unenroll_btn_{sub['subject_id']}", use_container_width=True, type="secondary"):
+                            unenroll_student_to_subject(selected_sid, sub['subject_id'])
+                            st.toast(f"Removed student from class roster successfully!")
+                            st.rerun()
+                else:
+                    st.info("No students enrolled in this course yet.")
+            st.write("")
     else:
         st.info("NO SUBJECTS FOUND. CREATE ONE ABOVE")
 
