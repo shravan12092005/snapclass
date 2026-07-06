@@ -33,6 +33,7 @@ By leveraging a serverless database (Supabase), high-precision feature extractor
 ### 📊 Attendance Tracking
 *   **AI Face Recognition Attendance**: Scans classroom photos (uploaded or live-captured) to identify all present students.
 *   **AI Voice Recognition Attendance**: Bulk audio upload/capture to recognize students saying phrases like "I am present" based on their pre-registered voice prints.
+*   **Interactive Attendance Overrides**: Allows teachers to review AI-detected attendance in an interactive card grid and manually toggle presence status ("Mark Present" / "Mark Absent") for each student before saving.
 *   **Attendance Statistics**: Real-time summaries displaying the number of sessions attended vs. total classes held.
 *   **Exportable Records**: Full logs displaying time, student name, course details, and presence logs.
 
@@ -40,6 +41,7 @@ By leveraging a serverless database (Supabase), high-precision feature extractor
 *   **Unique Course Codes**: Automatically creates alphanumeric identifiers for new subjects.
 *   **Course Linking and QR Codes**: Generates unique sharing links and QR codes via `segno` for WhatsApp/Email distribution.
 *   **Auto-Enrollment Handling**: Dynamic URL parameter listening (`?join-code=CS101`) to automatically enroll students upon logging in.
+*   **Class Roster Inspector**: Expands to show the complete student roster list along with individual attendance counts, rate percentages, and the ability to remove/unenroll students from the class.
 *   **Unenroll Support**: Simple dashboard actions allowing students to leave subjects instantly.
 *   **Subject Deletion Support**: Clear Delete option for teachers with secure cascading removals of all related enrollments and logs.
 
