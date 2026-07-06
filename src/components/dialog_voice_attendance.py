@@ -23,7 +23,7 @@ def voice_attendance_dialog(selected_subject_id):
             st.warning('⚠️ Please record or upload an audio clip before taking attendance.')
             return
 
-        with st.spinner('Processing Audio data'):
+        with st.spinner('Prcessing Audio data'):
             enrolled_res = supabase.table('subject_students').select("*, students(*)").eq('subject_id',selected_subject_id ).execute()
             enrolled_students = enrolled_res.data
 

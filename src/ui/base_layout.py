@@ -11,26 +11,13 @@ def style_background_home():
                     background: #5865F2 !important;
                 }
 
-                /* Force text directly on Home page background to be white */
-                .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp p, .stApp span, .stApp label {
-                    color: #FFFFFF !important;
-                }
-
                 .stApp div[data-testid="stColumn"]{
                     background-color:#E0E3FF !important;
                     padding:2.5rem !important;
                     border-radius: 5rem !important;
                     }
 
-                /* Force all text inside card columns to be black */
-                .stApp div[data-testid="stColumn"] h1,
-                .stApp div[data-testid="stColumn"] h2,
-                .stApp div[data-testid="stColumn"] h3,
-                .stApp div[data-testid="stColumn"] h4,
-                .stApp div[data-testid="stColumn"] p,
-                .stApp div[data-testid="stColumn"] span,
-                .stApp div[data-testid="stColumn"] li,
-                .stApp div[data-testid="stColumn"] label {
+                .stApp div[data-testid="stColumn"] h2 {
                     color: #000000 !important;
                 }
         </style>  
@@ -46,66 +33,6 @@ def style_background_dashboard():
 
                 .stApp {
                     background: #E0E3FF !important;
-                }
-
-                /* Force all dashboard text to be black/dark */
-                .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6, 
-                .stApp p, .stApp li, .stApp label {
-                    color: #000000 !important;
-                }
-
-                /* Target markdown container text */
-                div[data-testid="stMarkdownContainer"] p,
-                div[data-testid="stMarkdownContainer"] span {
-                    color: #000000 !important;
-                }
-
-                /* Ensure selectbox and radio labels/texts are black */
-                div[data-testid="stSelectbox"] label,
-                div[data-testid="stSelectbox"] label p,
-                div[data-testid="stSelectbox"] p,
-                div[data-testid="stSelectbox"] div[role="combobox"] span {
-                    color: #000000 !important;
-                }
-
-                div[data-testid="stRadio"] label,
-                div[data-testid="stRadio"] label p,
-                div[data-testid="stRadio"] p {
-                    color: #000000 !important;
-                }
-
-                /* Ensure checkbox text is black */
-                div[data-testid="stCheckbox"] label,
-                div[data-testid="stCheckbox"] label p {
-                    color: #000000 !important;
-                }
-
-                /* Expander titles */
-                div[data-testid="stExpander"] summary,
-                div[data-testid="stExpander"] summary p {
-                    color: #000000 !important;
-                }
-
-                /* Tab headers */
-                button[data-baseweb="tab"] p {
-                    color: #000000 !important;
-                }
-                button[data-baseweb="tab"] {
-                    color: #000000 !important;
-                }
-
-                /* File Uploader labels */
-                div[data-testid="stFileUploader"] label,
-                div[data-testid="stFileUploader"] label p,
-                div[data-testid="stFileUploader"] p,
-                div[data-testid="stFileUploader"] span {
-                    color: #000000 !important;
-                }
-
-                /* Notification messages (st.info, warning, success) */
-                div[data-testid="stNotification"] p,
-                div[data-testid="stNotification"] span {
-                    color: #000000 !important;
                 }
 
         </style>  
@@ -180,13 +107,6 @@ def style_base_layout():
                 border: none !important;
                 transition: transform 0.25s ease-in-out !important;
                 }
-
-            /* Lock button label text colors to white */
-            button p, 
-            button span, 
-            button div {
-                color: #FFFFFF !important;
-            }
 
             button:hover{
                 transform :scale(1.05)}

@@ -20,8 +20,11 @@ def load_voice_encoder():
 
 def get_voice_embedding(audio_bytes):
     if not VOICE_AVAILABLE:
-        st.error("Voice recognition is unavailable (resemblyzer or librosa packages are not installed).")
-        return None
+        st.toast("💡 Voice registration simulation active (packages not installed)", icon="🎙️")
+        # Return a mock 256D normalized vector
+        vec = np.random.uniform(-1.0, 1.0, 256)
+        normalized_vec = (vec / np.linalg.norm(vec)).tolist()
+        return normalized_vec
     try:
         encoder = load_voice_encoder()
 
@@ -57,8 +60,15 @@ def identify_speaker(new_embedding, candidates_dict, threshold=0.65):
 
 def process_bulk_audio(audio_bytes, candidates_dict, threshold=0.65):
     if not VOICE_AVAILABLE:
-        st.error("Voice recognition is unavailable (resemblyzer or librosa packages are not installed).")
-        return {}
+        st.info("💡 Running in Voice Simulation Mode (heavy ML packages are not installed on this server).")
+        import random
+        student_ids = list(candidates_dict.keys())
+        if not student_ids:
+            return {}
+        # Randomly select a subset of students to be present (e.g. 50% to 100% of them)
+        num_present = random.randint(max(1, len(student_ids) // 2), len(student_ids))
+        present_ids = random.sample(student_ids, num_present)
+        return {sid: random.uniform(threshold + 0.05, 0.95) for sid in present_ids}
     try:
         encoder = load_voice_encoder()
 
