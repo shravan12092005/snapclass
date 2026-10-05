@@ -1,5 +1,10 @@
+import time
+
 import streamlit as st
+
 from src.database.db import delete_subject
+from src.database.exceptions import DatabaseError
+
 
 @st.dialog("Delete Subject?")
 def delete_subject_dialog(subject_name, subject_id):
@@ -17,8 +22,7 @@ def delete_subject_dialog(subject_name, subject_id):
             try:
                 delete_subject(subject_id)
                 st.toast(f"✅ Deleted subject: {subject_name}", icon="🗑️")
-                import time
                 time.sleep(1)
                 st.rerun()
-            except Exception as e:
-                st.error(f"Failed to delete subject: {str(e)}")
+            except DatabaseError as e:
+                st.error(f"Failed to delete subject: {e}")

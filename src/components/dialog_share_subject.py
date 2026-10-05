@@ -6,8 +6,13 @@ import io
 
 @st.dialog("Share Class Link")
 def share_subject_dialog(subject_name, subject_code):
-    app_domain = "https://snapclassx.streamlit.app"
-    join_url = f"{app_domain}/?join-code={subject_code}"
+    # Derive deployment domain dynamically
+    host = st.context.headers.get("host")
+    if not host:
+        host = "localhost:8501"
+        
+    protocol = "http" if ("localhost" in host or "127.0.0.1" in host) else "https"
+    join_url = f"{protocol}://{host}/?join-code={subject_code}"
 
     st.header("Scan to Join")
 
@@ -29,7 +34,7 @@ def share_subject_dialog(subject_name, subject_code):
         encoded_message = urllib.parse.quote(f"Hey! Join our class attendance portal for {subject_name} on SnapClass here: {join_url}")
         whatsapp_share_url = f"https://api.whatsapp.com/send?text={encoded_message}"
         
-        st.link_button("💬 Share via WhatsApp", whatsapp_share_url, use_container_width=True)
+        st.link_button("💬 Share via WhatsApp", whatsapp_share_url, width="stretch")
         st.info('Or copy the class credentials above to distribute via Email/LMS.')
 
     with col2:
