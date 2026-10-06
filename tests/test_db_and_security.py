@@ -11,6 +11,8 @@ from src.database.db import (
     delete_subject,
     enroll_student_to_subject,
     lookup_subject_by_code,
+    get_enrolled_students,
+    get_subject_attendance_logs,
 )
 from src.components.subject_card import subject_card
 
@@ -100,6 +102,22 @@ class TestPagination(unittest.TestCase):
         results = fetch_all_pages(mock_query, page_size=5)
         self.assertEqual(len(results), 2)
         self.assertEqual(mock_query.range.call_count, 1)
+
+    @patch('src.database.db.fetch_all_pages')
+    @patch('src.database.db.supabase')
+    def test_get_enrolled_students_paginates(self, mock_supabase, mock_fetch):
+        mock_fetch.return_value = [{"student_id": i} for i in range(1500)]
+        res = get_enrolled_students(10)
+        self.assertEqual(len(res), 1500)
+        mock_fetch.assert_called_once()
+
+    @patch('src.database.db.fetch_all_pages')
+    @patch('src.database.db.supabase')
+    def test_get_subject_attendance_logs_paginates(self, mock_supabase, mock_fetch):
+        mock_fetch.return_value = [{"student_id": i, "is_present": True} for i in range(1200)]
+        res = get_subject_attendance_logs(10)
+        self.assertEqual(len(res), 1200)
+        mock_fetch.assert_called_once()
 
 
 class TestHtmlEscaping(unittest.TestCase):

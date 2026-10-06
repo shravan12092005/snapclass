@@ -260,19 +260,19 @@ def get_student_dashboard_data(student_id):
 
 def get_enrolled_students(subject_id):
     """Fetch enrolled students with their student profiles for a subject."""
-    response = safe_execute(
+    query = (
         supabase.table('subject_students')
         .select("*, students(*)")
         .eq('subject_id', subject_id)
     )
-    return response.data or []
+    return fetch_all_pages(query)
 
 
 def get_subject_attendance_logs(subject_id):
     """Fetch attendance log entries (student_id, is_present) for a subject."""
-    response = safe_execute(
+    query = (
         supabase.table('attendance_logs')
         .select('student_id, is_present')
         .eq('subject_id', subject_id)
     )
-    return response.data or []
+    return fetch_all_pages(query)
