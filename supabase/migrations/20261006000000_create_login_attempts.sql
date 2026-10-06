@@ -6,6 +6,8 @@
 --   - Per-IP backstop (default 30 failures / 10 min)
 --   - Atomic upsert via record_login_attempt()
 --   - Periodic cleanup via cleanup_expired_login_attempts()
+--   - Strict security: RLS enabled with NO policies (service_role only)
+--   - RPC execution revoked from public/anon/authenticated
 -- ==========================================================================
 
 CREATE TABLE IF NOT EXISTS login_attempts (
@@ -19,6 +21,11 @@ CREATE TABLE IF NOT EXISTS login_attempts (
 CREATE INDEX IF NOT EXISTS idx_login_attempts_updated_at ON login_attempts(updated_at);
 CREATE INDEX IF NOT EXISTS idx_login_attempts_blocked_until ON login_attempts(blocked_until);
 
+-- Enable Row Level Security (RLS) with NO policies:
+-- Only service_role (backend server) can select/insert/update/delete.
+-- anon and authenticated users have zero access to this table.
+ALTER TABLE login_attempts ENABLE ROW LEVEL SECURITY;
+
 -- Atomic upsert: increments attempts, calculates block time, and returns new state.
 CREATE OR REPLACE FUNCTION record_login_attempt(
     p_key_hash TEXT,
@@ -29,7 +36,9 @@ RETURNS TABLE (
     attempts INT,
     blocked_until TIMESTAMPTZ,
     is_blocked BOOLEAN
-) LANGUAGE plpgsql AS $$
+) LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
 DECLARE
     v_now TIMESTAMPTZ := timezone('utc'::text, now());
     v_attempts INT := 1;
@@ -74,7 +83,9 @@ $$;
 CREATE OR REPLACE FUNCTION cleanup_expired_login_attempts(
     p_older_than_seconds INT DEFAULT 86400
 )
-RETURNS INT LANGUAGE plpgsql AS $$
+RETURNS INT LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
 DECLARE
     v_count INT;
 BEGIN
@@ -85,3 +96,11 @@ BEGIN
     RETURN v_count;
 END;
 $$;
+
+-- Revoke execute permissions from PUBLIC, anon, authenticated
+REVOKE EXECUTE ON FUNCTION record_login_attempt(TEXT, INT, INT) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION cleanup_expired_login_attempts(INT) FROM PUBLIC, anon, authenticated;
+
+-- Grant execution strictly to service_role (backend service only)
+GRANT EXECUTE ON FUNCTION record_login_attempt(TEXT, INT, INT) TO service_role;
+GRANT EXECUTE ON FUNCTION cleanup_expired_login_attempts(INT) TO service_role;

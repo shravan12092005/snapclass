@@ -12,6 +12,7 @@ from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 SESSION_SECRET = os.environ.get("SESSION_SECRET", "CHANGE-ME-dev-only-secret")
 SESSION_MAX_AGE = 86400 * 7  # 7 days
 SESSION_COOKIE_NAME = "snapclass_session"
+COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "true").lower() in ("true", "1", "yes")
 
 _serializer = URLSafeTimedSerializer(SESSION_SECRET)
 
@@ -28,7 +29,7 @@ def create_session(response: Response, user_type: str, user_id: int):
         SESSION_COOKIE_NAME,
         token,
         httponly=True,
-        secure=True,
+        secure=COOKIE_SECURE,
         samesite="lax",
         max_age=SESSION_MAX_AGE,
         path="/",
