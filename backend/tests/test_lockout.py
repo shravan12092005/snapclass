@@ -71,11 +71,15 @@ class MockTable:
         return MagicMock(data=results)
 
 
+import threading
+
+
 class MockSupabaseWithRPC:
     """Mock simulating Supabase client and PostgreSQL record_login_attempt RPC."""
 
     def __init__(self):
         self.data_store = {}
+        self._lock = threading.Lock()
 
     def table(self, table_name):
         return MockTable(self.data_store)
@@ -83,9 +87,10 @@ class MockSupabaseWithRPC:
     def rpc(self, name, params):
         mock = MagicMock()
         if name == "record_login_attempt":
-            key = params["p_key_hash"]
-            max_attempts = params["p_max_attempts"]
-            lock_seconds = params["p_lock_seconds"]
+            with self._lock:
+                key = params["p_key_hash"]
+                max_attempts = params["p_max_attempts"]
+                lock_seconds = params["p_lock_seconds"]
 
             now = datetime.now(timezone.utc)
             existing = self.data_store.get(key)
@@ -304,6 +309,31 @@ class TestLockout(unittest.TestCase):
         with patch("app.lockout.TRUSTED_PROXIES", {"10.0.0.1"}):
             resolved_ip = get_client_ip(trusted_req)
             self.assertEqual(resolved_ip, "203.0.113.99", "Must extract real client IP from trusted proxy")
+
+    # -----------------------------------------------------------------------
+    # 9. Concurrent failure attempts simulation (Race Condition Protection)
+    # -----------------------------------------------------------------------
+    def test_concurrent_failures_thread_safety(self):
+        from concurrent.futures import ThreadPoolExecutor
+
+        device_id = "concurrent-device-test"
+        ip = "192.168.1.99"
+
+        # Fire 10 simultaneous failed login attempts across multiple worker threads
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            futures = [
+                executor.submit(record_failure, device_id, ip, client=self.db)
+                for _ in range(10)
+            ]
+            [f.result() for f in futures]
+
+        is_locked, remaining, reason = check_lockout(device_id, ip, client=self.db)
+        self.assertTrue(is_locked)
+        self.assertEqual(reason, "device")
+
+        dev_hash = hash_key("device", device_id)
+        # All 10 failures recorded without race-condition lost updates
+        self.assertEqual(self.db.data_store[dev_hash]["attempts"], 10)
 
 
 if __name__ == "__main__":
