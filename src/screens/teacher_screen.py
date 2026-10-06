@@ -16,10 +16,10 @@ from src.database.db import (
     teacher_login,
     get_teacher_subjects,
     get_attendance_for_teacher,
-    safe_execute,
+    get_enrolled_students,
+    get_subject_attendance_logs,
     unenroll_student_to_subject,
 )
-from src.database.config import supabase
 from src.database.exceptions import DatabaseError
 from src.components.dialog_create_subject import create_subject_dialog
 from src.components.dialog_share_subject import share_subject_dialog
@@ -183,16 +183,10 @@ def teacher_tab_take_attendance():
         if st.button('Run Face Analysis', width="stretch", type='secondary', icon=':material/analytics:', disabled=not has_photos):
             with st.spinner('Deep scanning classroom photos...'):
                 try:
-                    enrolled_res = safe_execute(
-                        supabase.table('subject_students')
-                        .select("*, students(*)")
-                        .eq('subject_id', selected_subject_id)
-                    )
+                    enrolled_students = get_enrolled_students(selected_subject_id)
                 except DatabaseError as e:
                     st.error(f"Could not load enrolled students: {e}")
                     return
-
-                enrolled_students = enrolled_res.data
 
                 if not enrolled_students:
                     st.warning('No students enrolled in this course')
@@ -306,16 +300,10 @@ def teacher_tab_manage_subjects():
 def _render_roster(sub):
     """Render the roster for *sub*, aggregating attendance in one query."""
     try:
-        roster_res = safe_execute(
-            supabase.table('subject_students')
-            .select("*, students(*)")
-            .eq('subject_id', sub['subject_id'])
-        )
+        roster = get_enrolled_students(sub['subject_id'])
     except DatabaseError as e:
         st.error(f"Could not load roster: {e}")
         return
-
-    roster = roster_res.data if roster_res.data else []
 
     if not roster:
         st.info("No students enrolled in this course yet.")
@@ -323,16 +311,10 @@ def _render_roster(sub):
 
     # Fetch all attendance for this subject in ONE query (not N+1)
     try:
-        att_res = safe_execute(
-            supabase.table('attendance_logs')
-            .select('student_id, is_present')
-            .eq('subject_id', sub['subject_id'])
-        )
+        att_logs = get_subject_attendance_logs(sub['subject_id'])
     except DatabaseError as e:
         st.error(f"Could not load attendance: {e}")
         return
-
-    att_logs = att_res.data if att_res.data else []
     roster_data = compute_roster_data(roster, att_logs)
 
     roster_df = pd.DataFrame(roster_data)

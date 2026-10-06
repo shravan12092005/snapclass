@@ -11,6 +11,14 @@ from fastapi import APIRouter, File, Form, HTTPException, Request, Response, Upl
 from PIL import Image, ImageOps
 
 from app.auth import create_session, destroy_session, require_student, require_teacher
+from app.lockout import (
+    check_lockout,
+    get_client_ip,
+    get_or_create_device_id,
+    record_failure,
+    reset_lockout,
+    set_device_cookie,
+)
 from app.models.auth import (
     MessageResponse,
     StudentLoginResponse,
@@ -96,11 +104,20 @@ def teacher_register_route(req: TeacherRegisterRequest, response: Response):
 async def student_face_login_route(
     request: Request, response: Response, image: UploadFile = File(...)
 ):
-    """Authenticate a student via face recognition.
+    """Authenticate a student via face recognition with device-cookie & IP lockout."""
+    device_id, is_new_device = get_or_create_device_id(request)
+    if is_new_device:
+        set_device_cookie(response, device_id)
 
-    NOTE: Face-login lockout storage is NOT implemented.
-    Ask the user before implementing lockout backend storage.
-    """
+    client_ip = get_client_ip(request)
+
+    is_locked, remaining_seconds, reason = check_lockout(device_id, client_ip)
+    if is_locked:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Too many failed login attempts. Locked out for {remaining_seconds} seconds.",
+        )
+
     if image.content_type not in ALLOWED_IMAGE_TYPES:
         raise HTTPException(400, "Only JPEG/PNG images accepted")
 
@@ -119,6 +136,13 @@ async def student_face_login_route(
     elif decision[0] == "multi_face":
         raise HTTPException(400, "Multiple faces detected — use a single-person photo")
     elif decision[0] == "not_recognized":
+        record_failure(device_id, client_ip)
+        locked_now, remaining, _ = check_lockout(device_id, client_ip)
+        if locked_now:
+            raise HTTPException(
+                status_code=429,
+                detail=f"Too many failed attempts. Lockout triggered for {remaining} seconds.",
+            )
         raise HTTPException(401, "Face not recognized")
     elif decision[0] == "recognized":
         student_id = decision[1]
@@ -126,6 +150,8 @@ async def student_face_login_route(
         if not student:
             raise HTTPException(401, "Student record not found")
 
+        reset_lockout(device_id)
+        set_device_cookie(response, device_id)
         create_session(response, "student", student_id)
         return StudentLoginResponse(
             message=f"Welcome Back {student['name']}",

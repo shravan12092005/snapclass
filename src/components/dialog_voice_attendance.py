@@ -3,8 +3,7 @@ import pandas as pd
 from datetime import datetime
 
 from src.pipelines.voice_pipeline import process_bulk_audio
-from src.database.db import safe_execute
-from src.database.config import supabase
+from src.database.db import get_enrolled_students
 from src.database.exceptions import DatabaseError
 from src.components.dialog_attendance_results import show_attendance_result_fragment
 from src.services.attendance import separate_voice_candidates, build_voice_attendance_results
@@ -28,16 +27,10 @@ def voice_attendance_dialog(selected_subject_id):
 
         with st.spinner('Processing audio data…'):
             try:
-                enrolled_res = safe_execute(
-                    supabase.table('subject_students')
-                    .select("*, students(*)")
-                    .eq('subject_id', selected_subject_id)
-                )
+                enrolled_students = get_enrolled_students(selected_subject_id)
             except DatabaseError as e:
                 st.error(f"Database error: {e}")
                 return
-
-            enrolled_students = enrolled_res.data
 
             if not enrolled_students:
                 st.warning('No students enrolled in this course')
