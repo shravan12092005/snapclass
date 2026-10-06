@@ -28,6 +28,9 @@ from src.components.dialog_delete_subject import delete_subject_dialog
 from src.pipelines.face_pipeline import predict_attendance
 from src.components.dialog_attendance_results import attendance_result_dialog
 from src.components.dialog_voice_attendance import voice_attendance_dialog
+from src.services.attendance import build_face_attendance_results
+from src.services.roster import compute_roster_data
+from src.services.auth_helpers import validate_registration_fields, validate_password
 
 
 # ---------------------------------------------------------------------------
@@ -215,27 +218,10 @@ def teacher_tab_take_attendance():
                     st.session_state.pop('active_attendance_logs', None)
                     st.session_state.pop('active_attendance_df', None)
 
-                    results, attendance_to_log = [], []
                     current_timestamp = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
-
-                    for node in enrolled_students:
-                        student = node['students']
-                        sources = all_detected_ids.get(int(student['student_id']), [])
-                        is_present = len(sources) > 0
-
-                        results.append({
-                            "Name": student['name'],
-                            "ID": student['student_id'],
-                            "Source": ", ".join(sources) if is_present else "-",
-                            "Status": "✅ Present" if is_present else "❌ Absent"
-                        })
-
-                        attendance_to_log.append({
-                            'student_id': student['student_id'],
-                            'subject_id': selected_subject_id,
-                            'timestamp': current_timestamp,
-                            'is_present': bool(is_present)
-                        })
+                    results, attendance_to_log = build_face_attendance_results(
+                        enrolled_students, all_detected_ids, selected_subject_id, current_timestamp
+                    )
 
                     # Store results in session_state and reopen via flag
                     st.session_state['face_attendance_pending'] = (pd.DataFrame(results), attendance_to_log)
@@ -346,33 +332,7 @@ def _render_roster(sub):
         return
 
     att_logs = att_res.data if att_res.data else []
-
-    # Aggregate in pandas
-    if att_logs:
-        att_df = pd.DataFrame(att_logs)
-        att_agg = att_df.groupby('student_id').agg(
-            total=('is_present', 'count'),
-            attended=('is_present', 'sum')
-        ).reset_index()
-        att_map = {int(row['student_id']): row for _, row in att_agg.iterrows()}
-    else:
-        att_map = {}
-
-    roster_data = []
-    for node in roster:
-        student = node['students']
-        sid = student['student_id']
-        agg = att_map.get(sid, {})
-        total_days = int(agg.get('total', 0))
-        attended_days = int(agg.get('attended', 0))
-        rate = (attended_days / total_days * 100) if total_days > 0 else 0.0
-
-        roster_data.append({
-            "Name": student['name'],
-            "ID": sid,
-            "Attended": f"{attended_days}/{total_days} classes",
-            "Rate": f"{rate:.1f}%"
-        })
+    roster_data = compute_roster_data(roster, att_logs)
 
     roster_df = pd.DataFrame(roster_data)
     st.dataframe(roster_df, hide_index=True, use_container_width=True)
@@ -573,26 +533,18 @@ def teacher_screen_login():
 
 
 def register_teacher(teacher_username, teacher_name, teacher_pass, teacher_pass_confirm):
-    if not teacher_username or not teacher_name or not teacher_pass:
-        return False, "All Fields are required!"
+    valid, error = validate_registration_fields(teacher_username, teacher_name, teacher_pass)
+    if not valid:
+        return False, error
     try:
         if check_teacher_exists(teacher_username):
             return False, "Username already taken"
     except DatabaseError as e:
         return False, f"Database error: {e}"
 
-    if teacher_pass != teacher_pass_confirm:
-        return False, "Password doesn't match"
-
-    # Enforce password strength checks
-    if len(teacher_pass) < 8:
-        return False, "Password must be at least 8 characters long!"
-    if not any(char.isdigit() for char in teacher_pass):
-        return False, "Password must contain at least one digit!"
-    if not any(char.isupper() for char in teacher_pass):
-        return False, "Password must contain at least one uppercase letter!"
-    if not any(char.islower() for char in teacher_pass):
-        return False, "Password must contain at least one lowercase letter!"
+    valid, error = validate_password(teacher_pass, teacher_pass_confirm)
+    if not valid:
+        return False, error
 
     try:
         result = create_teacher(teacher_username, teacher_pass, teacher_name)

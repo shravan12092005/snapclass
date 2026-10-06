@@ -7,6 +7,7 @@ from src.database.db import safe_execute
 from src.database.config import supabase
 from src.database.exceptions import DatabaseError
 from src.components.dialog_attendance_results import show_attendance_result_fragment
+from src.services.attendance import separate_voice_candidates, build_voice_attendance_results
 
 
 @st.dialog('Voice Attendance')
@@ -42,15 +43,7 @@ def voice_attendance_dialog(selected_subject_id):
                 st.warning('No students enrolled in this course')
                 return
 
-            # Separate students with and without voice profiles
-            candidates_dict = {}
-            no_profile_ids = set()
-            for s in enrolled_students:
-                student = s['students']
-                if student.get('voice_embedding'):
-                    candidates_dict[student['student_id']] = student['voice_embedding']
-                else:
-                    no_profile_ids.add(student['student_id'])
+            candidates_dict, no_profile_ids = separate_voice_candidates(enrolled_students)
 
             if not candidates_dict and not no_profile_ids:
                 st.error('No enrolled students found')
@@ -62,40 +55,11 @@ def voice_attendance_dialog(selected_subject_id):
                 audio_bytes = audio_data.read()
                 detected_scores = process_bulk_audio(audio_bytes, candidates_dict)
 
-            results, attendance_to_log = [], []
             current_timestamp = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
-
-            for node in enrolled_students:
-                student = node['students']
-                sid = student['student_id']
-
-                if sid in no_profile_ids:
-                    # No voice profile — show as "No voice profile", don't count as absent
-                    status_label = "⚠️ No voice profile"
-                    is_present = False
-                    source_val = "N/A"
-                else:
-                    score = detected_scores.get(sid, 0.0)
-                    is_present = sid in detected_scores
-                    status_label = "✅ Present" if is_present else "❌ Absent"
-                    source_val = score if is_present else "-"
-
-                results.append({
-                    "Name": student['name'],
-                    "ID": sid,
-                    "Source": source_val,
-                    "Status": status_label
-                })
-
-                # Students without profiles are excluded from the log
-                # so they aren't counted as absent by the AI
-                if sid not in no_profile_ids:
-                    attendance_to_log.append({
-                        'student_id': sid,
-                        'subject_id': selected_subject_id,
-                        'timestamp': current_timestamp,
-                        'is_present': bool(is_present)
-                    })
+            results, attendance_to_log = build_voice_attendance_results(
+                enrolled_students, detected_scores, no_profile_ids,
+                selected_subject_id, current_timestamp
+            )
 
             # Clear active attendance log cache to prevent stale results / collision
             st.session_state.pop('active_attendance_logs', None)

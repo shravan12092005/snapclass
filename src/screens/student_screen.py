@@ -20,6 +20,7 @@ from src.database.db import (
 from src.database.exceptions import DatabaseError
 from src.components.dialog_enroll import enroll_dialog
 from src.components.subject_card import subject_card
+from src.services.auth_helpers import face_login_decision, check_duplicate_face
 
 # ---------------------------------------------------------------------------
 # Session cleanup helper
@@ -183,44 +184,44 @@ def student_screen():
 
         with st.spinner('AI is scanning..'):
             detected, all_ids, num_faces = predict_attendance(img_np, login_mode=True)
+            decision = face_login_decision(detected, num_faces)
 
-            if num_faces == 0:
+            if decision[0] == "no_face":
                 st.warning('Face not found!')
-            elif num_faces > 1:
+            elif decision[0] == "multi_face":
                 st.warning('Multiple faces found')
-            else:
-                if detected:
-                    student_id = list(detected.keys())[0]
-                    try:
-                        student = get_student_by_id(student_id)
-                    except DatabaseError:
-                        student = None
+            elif decision[0] == "recognized":
+                student_id = decision[1]
+                try:
+                    student = get_student_by_id(student_id)
+                except DatabaseError:
+                    student = None
 
-                    if student:
-                        st.session_state.is_logged_in = True
-                        st.session_state.user_role = 'student'
-                        st.session_state.student_data = student
-                        st.session_state.face_login_attempts = 0  # reset attempts on success
-                        st.session_state.pop('temp_face_encoding', None)
-                        st.toast(f'Welcome Back {student["name"]}')
-                        time.sleep(1)
-                        st.rerun()
+                if student:
+                    st.session_state.is_logged_in = True
+                    st.session_state.user_role = 'student'
+                    st.session_state.student_data = student
+                    st.session_state.face_login_attempts = 0  # reset attempts on success
+                    st.session_state.pop('temp_face_encoding', None)
+                    st.toast(f'Welcome Back {student["name"]}')
+                    time.sleep(1)
+                    st.rerun()
+            elif decision[0] == "not_recognized":
+                st.session_state.face_login_attempts += 1
+                if st.session_state.face_login_attempts >= 5:
+                    st.session_state.face_login_blocked_until = time.time() + 60  # lock for 60 seconds
+                    st.session_state.face_login_attempts = 0
+                    st.session_state.pop('temp_face_encoding', None)
+                    st.error("🔒 Too many failed attempts. Lockout triggered for 60 seconds.")
+                    time.sleep(1)
+                    st.rerun()
                 else:
-                    st.session_state.face_login_attempts += 1
-                    if st.session_state.face_login_attempts >= 5:
-                        st.session_state.face_login_blocked_until = time.time() + 60  # lock for 60 seconds
-                        st.session_state.face_login_attempts = 0
-                        st.session_state.pop('temp_face_encoding', None)
-                        st.error("🔒 Too many failed attempts. Lockout triggered for 60 seconds.")
-                        time.sleep(1)
-                        st.rerun()
+                    st.warning(f'Face not recognized! (Attempt {st.session_state.face_login_attempts}/5)')
+                    encodings = get_face_embeddings(img_np)
+                    if encodings:
+                        st.session_state.temp_face_encoding = encodings[0].tolist()
                     else:
-                        st.warning(f'Face not recognized! (Attempt {st.session_state.face_login_attempts}/5)')
-                        encodings = get_face_embeddings(img_np)
-                        if encodings:
-                            st.session_state.temp_face_encoding = encodings[0].tolist()
-                        else:
-                            st.error('Could not capture your facial features. Please try again.')
+                        st.error('Could not capture your facial features. Please try again.')
 
     if 'temp_face_encoding' in st.session_state and not show_registration:
         st.write("If you are a new student, click below to register a profile using the scanned face:")
@@ -265,14 +266,7 @@ def student_screen():
                                     all_students = None
 
                                 if all_students is not None:
-                                    duplicate_student = None
-                                    for student in all_students:
-                                        emb = student.get('face_embedding')
-                                        if emb:
-                                            dist = np.linalg.norm(np.array(emb) - np.array(face_emb))
-                                            if dist <= 0.6:
-                                                duplicate_student = student
-                                                break
+                                    duplicate_student = check_duplicate_face(face_emb, all_students)
 
                                     if duplicate_student:
                                         st.error(f"❌ Registration failed: A student matching this face is already registered (Name: {duplicate_student['name']}). Please log in instead.")
