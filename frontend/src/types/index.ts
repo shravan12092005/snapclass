@@ -86,6 +86,11 @@ export interface StudentDashboardSubject {
   rate: number;
 }
 
+export interface StudentDashboardResponse {
+  student: Student;
+  subjects: StudentDashboardSubject[];
+}
+
 export interface AttendanceRecord {
   record_id?: number;
   student_id: number;

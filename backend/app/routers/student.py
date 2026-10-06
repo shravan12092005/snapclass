@@ -3,9 +3,9 @@
 Student ID derived from session cookie only.
 """
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Response
 
-from app.auth import require_student
+from app.auth import require_student, destroy_session
 from app.models.attendance import StudentDashboardResponse, StudentDashboardSubject, StudentResponseRef
 from app.models.auth import MessageResponse
 from app.services.db import (
@@ -51,7 +51,7 @@ def student_dashboard_route(request: Request):
 
 
 @router.delete("/profile", response_model=MessageResponse)
-def delete_profile_route(request: Request):
+def delete_profile_route(request: Request, response: Response):
     student_id = require_student(request)
 
     student = get_student_by_id(student_id)
@@ -59,5 +59,6 @@ def delete_profile_route(request: Request):
         raise HTTPException(404, "Student not found")
 
     delete_student(student_id)
+    destroy_session(response)
     train_classifier()
     return MessageResponse(message="Profile deleted")

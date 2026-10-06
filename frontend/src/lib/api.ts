@@ -9,6 +9,7 @@ import {
   VoiceAttendanceResponse,
   AttendanceLogEntry,
   AttendanceSessionSummary,
+  StudentDashboardResponse,
 } from "@/types";
 
 export class ApiError extends Error {
@@ -200,5 +201,32 @@ export const api = {
   async getAttendanceRecords(): Promise<AttendanceSessionSummary[]> {
     const res = await fetchJson<{ sessions: AttendanceSessionSummary[] }>("/api/attendance/records");
     return res.sessions || [];
+  },
+
+  // -------------------------------------------------------------------------
+  // Student Dashboard & Enrollment
+  // -------------------------------------------------------------------------
+  async getStudentDashboard(): Promise<StudentDashboardResponse> {
+    return fetchJson<StudentDashboardResponse>("/api/student/dashboard");
+  },
+
+  async enrollInSubject(subjectCode: string): Promise<{ message: string }> {
+    return fetchJson<{ message: string }>("/api/enrollment/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subject_code: subjectCode }),
+    });
+  },
+
+  async unenrollFromSubject(subjectId: number): Promise<{ message: string }> {
+    return fetchJson<{ message: string }>(`/api/enrollment/${subjectId}`, {
+      method: "DELETE",
+    });
+  },
+
+  async deleteStudentProfile(): Promise<{ message: string }> {
+    return fetchJson<{ message: string }>("/api/student/profile", {
+      method: "DELETE",
+    });
   },
 };
