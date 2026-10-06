@@ -13,6 +13,8 @@ Verifies:
 """
 
 from datetime import datetime, timezone, timedelta
+import os
+os.environ.setdefault("DEV_MODE", "true")
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -91,42 +93,75 @@ class MockSupabaseWithRPC:
                 key = params["p_key_hash"]
                 max_attempts = params["p_max_attempts"]
                 lock_seconds = params["p_lock_seconds"]
+                window_seconds = params.get("p_window_seconds")
 
-            now = datetime.now(timezone.utc)
-            existing = self.data_store.get(key)
+                now = datetime.now(timezone.utc)
+                existing = self.data_store.get(key)
 
-            if existing:
-                blocked_until_str = existing.get("blocked_until")
-                blocked_until = (
-                    datetime.fromisoformat(blocked_until_str.replace("Z", "+00:00"))
-                    if blocked_until_str
-                    else None
-                )
-                if blocked_until and blocked_until <= now:
-                    attempts = 1
+                if existing:
+                    blocked_until_str = existing.get("blocked_until")
+                    blocked_until = (
+                        datetime.fromisoformat(blocked_until_str.replace("Z", "+00:00"))
+                        if blocked_until_str
+                        else None
+                    )
+                    updated_at_str = existing.get("updated_at")
+                    updated_at = (
+                        datetime.fromisoformat(updated_at_str.replace("Z", "+00:00"))
+                        if updated_at_str
+                        else None
+                    )
+
+                    # Case 1: Already blocked -> increment attempts, but DO NOT extend blocked_until
+                    if blocked_until and blocked_until > now:
+                        attempts = existing["attempts"] + 1
+                        new_blocked_until = blocked_until_str
+                    # Case 2 & 3: Previous block expired OR window expired -> reset to 1
+                    elif (blocked_until and blocked_until <= now) or (
+                        window_seconds is not None
+                        and updated_at
+                        and (now - updated_at).total_seconds() > window_seconds
+                    ):
+                        attempts = 1
+                        new_blocked_until = (
+                            (now + timedelta(seconds=lock_seconds)).isoformat()
+                            if attempts >= max_attempts
+                            else None
+                        )
+                    # Case 4: Normal increment within active window
+                    else:
+                        attempts = existing["attempts"] + 1
+                        new_blocked_until = (
+                            (now + timedelta(seconds=lock_seconds)).isoformat()
+                            if attempts >= max_attempts
+                            else None
+                        )
                 else:
-                    attempts = existing["attempts"] + 1
-            else:
-                attempts = 1
+                    attempts = 1
+                    new_blocked_until = (
+                        (now + timedelta(seconds=lock_seconds)).isoformat()
+                        if attempts >= max_attempts
+                        else None
+                    )
 
-            new_blocked_until = None
-            if attempts >= max_attempts:
-                new_blocked_until = (now + timedelta(seconds=lock_seconds)).isoformat()
+                self.data_store[key] = {
+                    "key_hash": key,
+                    "attempts": attempts,
+                    "blocked_until": new_blocked_until,
+                    "updated_at": now.isoformat(),
+                }
 
-            self.data_store[key] = {
-                "key_hash": key,
-                "attempts": attempts,
-                "blocked_until": new_blocked_until,
-                "updated_at": now.isoformat(),
-            }
-
-            result_data = [{
-                "attempts": attempts,
-                "blocked_until": new_blocked_until,
-                "is_blocked": bool(new_blocked_until),
-            }]
-            mock.execute.return_value = MagicMock(data=result_data)
-            return mock
+                is_blocked = bool(
+                    new_blocked_until
+                    and datetime.fromisoformat(new_blocked_until.replace("Z", "+00:00")) > now
+                )
+                result_data = [{
+                    "attempts": attempts,
+                    "blocked_until": new_blocked_until,
+                    "is_blocked": is_blocked,
+                }]
+                mock.execute.return_value = MagicMock(data=result_data)
+                return mock
         elif name == "cleanup_expired_login_attempts":
             mock.execute.return_value = MagicMock(data=1)
             return mock
@@ -334,6 +369,110 @@ class TestLockout(unittest.TestCase):
         dev_hash = hash_key("device", device_id)
         # All 10 failures recorded without race-condition lost updates
         self.assertEqual(self.db.data_store[dev_hash]["attempts"], 10)
+
+    # -----------------------------------------------------------------------
+    # 10. Active lock is NOT extended on subsequent failure (DoS protection)
+    # -----------------------------------------------------------------------
+    def test_active_lock_not_extended_on_subsequent_failure(self):
+        device_id = "device-lock-extend-test"
+        ip = "192.168.1.101"
+
+        # Trigger 5 failures -> locks device
+        for _ in range(5):
+            record_failure(device_id, ip, client=self.db)
+
+        dev_hash = hash_key("device", device_id)
+        original_blocked_until = self.db.data_store[dev_hash]["blocked_until"]
+        self.assertIsNotNone(original_blocked_until)
+
+        # 6th failure while still locked
+        res = record_failure(device_id, ip, client=self.db)
+        self.assertTrue(res["device"]["is_blocked"])
+        self.assertEqual(res["device"]["blocked_until"], original_blocked_until)
+        # Verify blocked_until in database store was NOT extended
+        self.assertEqual(
+            self.db.data_store[dev_hash]["blocked_until"],
+            original_blocked_until,
+            "blocked_until must NOT be extended while the key is already blocked"
+        )
+
+    # -----------------------------------------------------------------------
+    # 11. IP window resets attempts after window expires (p_window_seconds)
+    # -----------------------------------------------------------------------
+    def test_ip_window_resets_attempts_after_window_seconds(self):
+        device_id = "device-ip-window-test"
+        ip = "198.51.100.77"
+
+        # Record 4 failures for this IP
+        for _ in range(4):
+            record_failure(device_id, ip, client=self.db)
+
+        ip_hash = hash_key("ip", ip)
+        self.assertEqual(self.db.data_store[ip_hash]["attempts"], 4)
+
+        # Simulate 15 minutes elapsed (window is 10 min = 600 seconds)
+        fifteen_minutes_ago = (datetime.now(timezone.utc) - timedelta(seconds=900)).isoformat()
+        self.db.data_store[ip_hash]["updated_at"] = fifteen_minutes_ago
+
+        # Record a new failure from a different device on the same IP
+        res = record_failure("another-device", ip, client=self.db)
+
+        # IP attempts must have reset to 1 (not incremented to 5)
+        self.assertEqual(res["ip"]["attempts"], 1)
+        self.assertFalse(res["ip"]["is_blocked"])
+        self.assertEqual(self.db.data_store[ip_hash]["attempts"], 1)
+
+    # -----------------------------------------------------------------------
+    # 12. Per-device counter persists across time (long window / today's semantics)
+    # -----------------------------------------------------------------------
+    def test_device_counter_persists_across_time(self):
+        device_id = "device-persists-test"
+        ip = "192.168.1.102"
+
+        # Record 4 failures
+        for _ in range(4):
+            record_failure(device_id, ip, client=self.db)
+
+        dev_hash = hash_key("device", device_id)
+        self.assertEqual(self.db.data_store[dev_hash]["attempts"], 4)
+
+        # Simulate 10 days passing for the device
+        ten_days_ago = (datetime.now(timezone.utc) - timedelta(days=10)).isoformat()
+        self.db.data_store[dev_hash]["updated_at"] = ten_days_ago
+
+        # 5th failure arrives: per-device counter persists until success or lock
+        res = record_failure(device_id, ip, client=self.db)
+
+        # Device should lock on 5th attempt
+        self.assertEqual(res["device"]["attempts"], 5)
+        self.assertTrue(res["device"]["is_blocked"])
+
+    # -----------------------------------------------------------------------
+    # 13. Secrets refuse to start without DEV_MODE=true
+    # -----------------------------------------------------------------------
+    def test_secrets_refuse_to_start_without_dev_mode(self):
+        import subprocess
+        import sys
+
+        # 1. Missing SESSION_SECRET and DEV_MODE="" -> fails at import
+        env_no_secret = {k: v for k, v in os.environ.items() if k not in ("SESSION_SECRET", "LOCKOUT_SECRET", "DEV_MODE")}
+        cmd_auth = [sys.executable, "-c", "from app.auth import SESSION_SECRET"]
+        proc_auth = subprocess.run(cmd_auth, capture_output=True, text=True, env=env_no_secret)
+        self.assertNotEqual(proc_auth.returncode, 0)
+        self.assertIn("SESSION_SECRET environment variable is missing", proc_auth.stderr)
+
+        # 2. Missing LOCKOUT_SECRET and DEV_MODE="" -> fails at import
+        cmd_lockout = [sys.executable, "-c", "from app.lockout import LOCKOUT_SECRET"]
+        proc_lockout = subprocess.run(cmd_lockout, capture_output=True, text=True, env=env_no_secret)
+        self.assertNotEqual(proc_lockout.returncode, 0)
+        self.assertIn("LOCKOUT_SECRET environment variable is missing", proc_lockout.stderr)
+
+        # 3. With DEV_MODE=true -> starts successfully
+        env_dev = dict(env_no_secret, DEV_MODE="true")
+        proc_auth_dev = subprocess.run(cmd_auth, capture_output=True, text=True, env=env_dev)
+        self.assertEqual(proc_auth_dev.returncode, 0)
+        proc_lockout_dev = subprocess.run(cmd_lockout, capture_output=True, text=True, env=env_dev)
+        self.assertEqual(proc_lockout_dev.returncode, 0)
 
 
 if __name__ == "__main__":

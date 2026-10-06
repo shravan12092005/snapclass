@@ -22,6 +22,13 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(name)s  %(messa
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    dev_mode = os.environ.get("DEV_MODE", "").strip().lower() in ("true", "1", "yes")
+    if not dev_mode:
+        if not os.environ.get("SESSION_SECRET"):
+            raise RuntimeError("SESSION_SECRET environment variable is missing. Refusing to start.")
+        if not os.environ.get("LOCKOUT_SECRET"):
+            raise RuntimeError("LOCKOUT_SECRET environment variable is missing. Refusing to start.")
+
     logger.info("Loading ML models at startup…")
     from app.services.face_pipeline import load_dlib_models
     from app.services.voice_pipeline import load_voice_encoder

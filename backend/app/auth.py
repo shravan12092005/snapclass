@@ -9,7 +9,18 @@ import os
 from fastapi import HTTPException, Request, Response
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
-SESSION_SECRET = os.environ.get("SESSION_SECRET", "CHANGE-ME-dev-only-secret")
+DEV_MODE = os.environ.get("DEV_MODE", "").strip().lower() in ("true", "1", "yes")
+
+SESSION_SECRET = os.environ.get("SESSION_SECRET")
+if not SESSION_SECRET:
+    if DEV_MODE:
+        SESSION_SECRET = "dev-insecure-session-secret"
+    else:
+        raise RuntimeError(
+            "SESSION_SECRET environment variable is missing. "
+            "Refusing to start. Set SESSION_SECRET or set DEV_MODE=true for local development."
+        )
+
 SESSION_MAX_AGE = 86400 * 7  # 7 days
 SESSION_COOKIE_NAME = "snapclass_session"
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "true").lower() in ("true", "1", "yes")

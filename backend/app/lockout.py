@@ -33,16 +33,29 @@ DEVICE_COOKIE_MAX_AGE = 365 * 86400  # 1 year
 
 DEVICE_MAX_FAILURES = 5
 DEVICE_LOCK_SECONDS = 60
+# Per-device keys persist until success or lock (or long window if set via env)
+DEVICE_WINDOW_SECONDS = (
+    int(os.environ["LOCKOUT_DEVICE_WINDOW_SECONDS"])
+    if os.environ.get("LOCKOUT_DEVICE_WINDOW_SECONDS")
+    else None
+)
 
-IP_MAX_FAILURES = int(os.environ.get("IP_LOCKOUT_MAX_ATTEMPTS", "30"))
-IP_LOCK_SECONDS = int(os.environ.get("IP_LOCKOUT_WINDOW_SECONDS", "600"))
+IP_MAX_FAILURES = int(os.environ.get("IP_LOCKOUT_MAX_ATTEMPTS", os.environ.get("LOCKOUT_IP_MAX_ATTEMPTS", "30")))
+IP_LOCK_SECONDS = int(os.environ.get("IP_LOCKOUT_WINDOW_SECONDS", os.environ.get("LOCKOUT_IP_WINDOW_SECONDS", "600")))
+IP_WINDOW_SECONDS = int(os.environ.get("LOCKOUT_IP_WINDOW_SECONDS", os.environ.get("IP_LOCKOUT_WINDOW_SECONDS", "600")))
 
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "true").lower() in ("true", "1", "yes")
+DEV_MODE = os.environ.get("DEV_MODE", "").strip().lower() in ("true", "1", "yes")
 
-LOCKOUT_SECRET = os.environ.get(
-    "LOCKOUT_SECRET",
-    os.environ.get("SESSION_SECRET", "CHANGE-ME-dev-only-secret")
-)
+LOCKOUT_SECRET = os.environ.get("LOCKOUT_SECRET")
+if not LOCKOUT_SECRET:
+    if DEV_MODE:
+        LOCKOUT_SECRET = os.environ.get("SESSION_SECRET", "dev-insecure-lockout-secret")
+    else:
+        raise RuntimeError(
+            "LOCKOUT_SECRET environment variable is missing. "
+            "Refusing to start. Set LOCKOUT_SECRET or set DEV_MODE=true for local development."
+        )
 
 # Trusted proxy IPs (comma-separated, e.g. "127.0.0.1,10.0.0.1")
 TRUSTED_PROXIES = {
@@ -207,6 +220,7 @@ def record_key_failure(
     key_hash: str,
     max_attempts: int,
     lock_seconds: int,
+    window_seconds: Optional[int] = None,
     client=None
 ) -> dict:
     """Atomically record a login failure via RPC ``record_login_attempt``.
@@ -227,14 +241,13 @@ def record_key_failure(
         }
 
     try:
-        rpc_res = db.rpc(
-            "record_login_attempt",
-            {
-                "p_key_hash": key_hash,
-                "p_max_attempts": max_attempts,
-                "p_lock_seconds": lock_seconds,
-            }
-        ).execute()
+        rpc_params = {
+            "p_key_hash": key_hash,
+            "p_max_attempts": max_attempts,
+            "p_lock_seconds": lock_seconds,
+            "p_window_seconds": window_seconds,
+        }
+        rpc_res = db.rpc("record_login_attempt", rpc_params).execute()
 
         if rpc_res.data:
             data = rpc_res.data[0] if isinstance(rpc_res.data, list) else rpc_res.data
@@ -265,6 +278,7 @@ def record_failure(device_id: str, client_ip: str, client=None) -> dict:
         dev_hash,
         max_attempts=DEVICE_MAX_FAILURES,
         lock_seconds=DEVICE_LOCK_SECONDS,
+        window_seconds=DEVICE_WINDOW_SECONDS,
         client=client,
     )
 
@@ -273,6 +287,7 @@ def record_failure(device_id: str, client_ip: str, client=None) -> dict:
         ip_hash,
         max_attempts=IP_MAX_FAILURES,
         lock_seconds=IP_LOCK_SECONDS,
+        window_seconds=IP_WINDOW_SECONDS,
         client=client,
     )
 

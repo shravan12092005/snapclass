@@ -6,6 +6,8 @@ Verifies:
 - Sensitive fields (password, face_embedding, voice_embedding) never in responses
 """
 
+import os
+os.environ.setdefault("DEV_MODE", "true")
 import unittest
 from unittest.mock import MagicMock, patch
 
