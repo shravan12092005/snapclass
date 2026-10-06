@@ -21,6 +21,7 @@ from app.services.db import (
     get_teacher_subjects,
     lookup_subject_by_code,
     safe_execute,
+    unenroll_student_to_subject,
 )
 from app.services.roster import compute_roster_data
 from app.config import supabase
@@ -148,3 +149,17 @@ def get_roster(subject_id: int, request: Request):
 
     roster_data = compute_roster_data(roster, att_logs)
     return RosterResponse(roster=[RosterEntry(**r) for r in roster_data])
+
+
+@router.delete("/{subject_id}/students/{student_id}", response_model=MessageResponse)
+def remove_student_from_roster(subject_id: int, student_id: int, request: Request):
+    teacher_id = require_teacher(request)
+
+    # Ownership check
+    subjects = get_teacher_subjects(teacher_id)
+    if not any(s["subject_id"] == subject_id for s in subjects):
+        raise HTTPException(403, "You do not own this subject")
+
+    unenroll_student_to_subject(student_id, subject_id)
+    return MessageResponse(message="Student removed from roster")
+

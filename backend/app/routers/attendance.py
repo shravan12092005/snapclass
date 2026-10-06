@@ -197,6 +197,10 @@ def get_records_route(request: Request):
             Subject=row["Subject"],
             Subject_Code=row["Subject Code"],
             Attendance_Stats=row["Attendance Stats"],
+            ts_group=str(row["ts_group"]) if pd.notna(row.get("ts_group")) else None,
+            present_count=int(row.get("Present_Count", 0)),
+            total_count=int(row.get("Total_Count", 0)),
+            rate=round(float(row.get("Present_Count", 0) / row.get("Total_Count", 1) * 100), 1) if row.get("Total_Count", 0) > 0 else 0.0,
         )
         for _, row in summary.iterrows()
     ]

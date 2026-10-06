@@ -206,5 +206,59 @@ class TestResponseModelSafety(unittest.TestCase):
         self.assertEqual(dumped["name"], "Alice")
 
 
+    def test_attendance_session_summary_fields(self):
+        """AttendanceSessionSummary must include ts_group, present_count, total_count, and rate."""
+        from app.models.attendance import AttendanceSessionSummary
+        summary = AttendanceSessionSummary(
+            Time="2026-10-06 09:30 AM",
+            Subject="CS101",
+            Subject_Code="ABC1234",
+            Attendance_Stats="✅ 18 / 20 Students",
+            ts_group="2026-10-06T09:30:00",
+            present_count=18,
+            total_count=20,
+            rate=90.0,
+        )
+        dumped = summary.model_dump()
+        self.assertEqual(dumped["present_count"], 18)
+        self.assertEqual(dumped["total_count"], 20)
+        self.assertEqual(dumped["rate"], 90.0)
+        self.assertEqual(dumped["ts_group"], "2026-10-06T09:30:00")
+
+
+class TestSubjectRosterEndpoints(unittest.TestCase):
+
+    @patch("app.routers.subjects.unenroll_student_to_subject")
+    @patch("app.routers.subjects.get_teacher_subjects")
+    @patch("app.routers.subjects.require_teacher")
+    def test_remove_student_from_roster_owner_success(
+        self, mock_require_teacher, mock_get_subjects, mock_unenroll
+    ):
+        from app.routers.subjects import remove_student_from_roster
+        mock_require_teacher.return_value = 1
+        mock_get_subjects.return_value = [{"subject_id": 10, "name": "CS101"}]
+        request = MagicMock()
+
+        res = remove_student_from_roster(10, 42, request)
+        self.assertEqual(res.message, "Student removed from roster")
+        mock_unenroll.assert_called_once_with(42, 10)
+
+    @patch("app.routers.subjects.get_teacher_subjects")
+    @patch("app.routers.subjects.require_teacher")
+    def test_remove_student_from_roster_not_owner_forbidden(
+        self, mock_require_teacher, mock_get_subjects
+    ):
+        from app.routers.subjects import remove_student_from_roster
+        from fastapi import HTTPException
+        mock_require_teacher.return_value = 1
+        mock_get_subjects.return_value = [{"subject_id": 99, "name": "Other Course"}]
+        request = MagicMock()
+
+        with self.assertRaises(HTTPException) as ctx:
+            remove_student_from_roster(10, 42, request)
+        self.assertEqual(ctx.exception.status_code, 403)
+
+
 if __name__ == "__main__":
     unittest.main()
+

@@ -37,6 +37,10 @@ class AttendanceSessionSummary(BaseModel):
     Subject: str
     Subject_Code: str
     Attendance_Stats: str
+    ts_group: str | None = None
+    present_count: int = 0
+    total_count: int = 0
+    rate: float = 0.0
 
 
 class AttendanceRecordsResponse(BaseModel):
