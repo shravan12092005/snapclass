@@ -31,6 +31,7 @@ from src.components.dialog_voice_attendance import voice_attendance_dialog
 from src.services.attendance import build_face_attendance_results
 from src.services.roster import compute_roster_data
 from src.services.auth_helpers import validate_registration_fields, validate_password
+from src.services.records import flatten_attendance_records, filter_records_by_date, aggregate_attendance_sessions
 
 
 # ---------------------------------------------------------------------------
@@ -377,17 +378,7 @@ def teacher_tab_attendance_records():
         st.info("No attendance records found yet. Take your first attendance to see records here.")
         return
 
-    data = []
-    for r in records:
-        ts = r.get('timestamp')
-        data.append({
-            "ts_raw": ts,
-            "ts_group": ts.split(".")[0] if ts else None,
-            "Time": datetime.fromisoformat(ts).strftime("%Y-%m-%d %I:%M %p") if ts else "N/A",
-            "Subject": r['subjects']['name'],
-            "Subject Code": r['subjects']['subject_code'],
-            "is_present": bool(r.get('is_present', False))
-        })
+    data = flatten_attendance_records(records)
 
     df = pd.DataFrame(data)
 
@@ -405,8 +396,7 @@ def teacher_tab_attendance_records():
         # Handle incomplete date range (single date selected)
         if isinstance(selected_range, tuple) and len(selected_range) == 2:
             start_date, end_date = selected_range
-            df['Date_Obj'] = pd.to_datetime(df['ts_group']).dt.date
-            df = df[(df['Date_Obj'] >= start_date) & (df['Date_Obj'] <= end_date)]
+            df = filter_records_by_date(df, start_date, end_date)
         else:
             st.info("Please select both a start and end date to filter records.")
             return
@@ -415,18 +405,7 @@ def teacher_tab_attendance_records():
         st.info("No attendance records found for the selected date range.")
         return
 
-    summary = (
-        df.groupby(['ts_group', 'Time', 'Subject', 'Subject Code'])
-        .agg(
-            Present_Count=('is_present', 'sum'),
-            Total_Count=('is_present', 'count')
-        ).reset_index()
-    )
-
-    summary['Attendance Stats'] = (
-        "✅ " + summary['Present_Count'].astype(str) + " /"
-        + summary['Total_Count'].astype(str) + ' Students'
-    )
+    summary = aggregate_attendance_sessions(df)
 
     # Visual Trend Chart Section
     subject_list = sorted(list(summary['Subject'].unique()))

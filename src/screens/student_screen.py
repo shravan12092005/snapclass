@@ -21,6 +21,7 @@ from src.database.exceptions import DatabaseError
 from src.components.dialog_enroll import enroll_dialog
 from src.components.subject_card import subject_card
 from src.services.auth_helpers import face_login_decision, check_duplicate_face
+from src.services.records import compute_student_subject_stats
 
 # ---------------------------------------------------------------------------
 # Session cleanup helper
@@ -77,19 +78,17 @@ def student_dashboard():
     if not dashboard_data:
         st.info("You are not enrolled in any subjects yet. Click 'Enroll in Subject' above to get started!")
 
+    subject_stats = compute_student_subject_stats(dashboard_data)
+
     cols = st.columns(2)
-    for i, node in enumerate(dashboard_data):
+    for i, stat in enumerate(subject_stats):
+        sid = stat['subject_id']
+        stats = {"total": stat['total'], "attended": stat['attended']}
+        percentage = stat['percentage']
+
+        # Look up the original node for nested sub info (section, code)
+        node = dashboard_data[i]
         sub = node['subjects']
-        sid = sub['subject_id']
-        logs = sub.get('attendance_logs', [])
-
-        stats = {"total": 0, "attended": 0}
-        for log in logs:
-            stats['total'] += 1
-            if log.get('is_present'):
-                stats['attended'] += 1
-
-        percentage = (stats['attended'] / stats['total'] * 100) if stats['total'] > 0 else 0.0
 
         def unenroll_button(s=sid, sn=sub['name']):
             if st.button("Unenroll from this course", type='tertiary', width="stretch", icon=':material/delete_forever:', key=f"unenroll_{s}"):

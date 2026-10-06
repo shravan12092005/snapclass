@@ -1,9 +1,15 @@
-"""Tests for audio conversion (WebM/Opus → WAV via ffmpeg)."""
+"""Tests for audio conversion (WebM/Opus → WAV via ffmpeg).
+
+Includes a real WebM/Opus fixture test (fixtures/test_opus.webm).
+"""
 
 import io
+import os
 import struct
 import unittest
 import wave
+
+FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
 
 
 class TestAudioConvert(unittest.TestCase):
@@ -32,6 +38,29 @@ class TestAudioConvert(unittest.TestCase):
             self.assertEqual(wf.getframerate(), 16000)
             self.assertEqual(wf.getnchannels(), 1)
             self.assertEqual(wf.getsampwidth(), 2)
+
+    def test_webm_opus_to_wav(self):
+        """Real WebM/Opus fixture must convert to 16 kHz mono WAV."""
+        from app.audio_convert import convert_to_wav
+
+        fixture_path = os.path.join(FIXTURES_DIR, "test_opus.webm")
+        if not os.path.exists(fixture_path):
+            self.skipTest(f"Fixture not found: {fixture_path}")
+
+        with open(fixture_path, "rb") as f:
+            webm_bytes = f.read()
+
+        self.assertGreater(len(webm_bytes), 100, "Fixture looks too small")
+
+        result = convert_to_wav(webm_bytes, "audio/webm")
+
+        buf = io.BytesIO(result)
+        with wave.open(buf) as wf:
+            self.assertEqual(wf.getframerate(), 16000)
+            self.assertEqual(wf.getnchannels(), 1)
+            self.assertEqual(wf.getsampwidth(), 2)
+            # 0.5s of audio at 16kHz = ~8000 frames (allow some tolerance)
+            self.assertGreater(wf.getnframes(), 4000)
 
     def test_invalid_input_raises(self):
         """Garbage input should raise RuntimeError."""

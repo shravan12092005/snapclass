@@ -184,30 +184,20 @@ def get_records_route(request: Request):
     if not records:
         return AttendanceRecordsResponse(sessions=[])
 
-    # Build session summaries (same logic as teacher_tab_attendance_records)
-    from collections import defaultdict
-    sessions_map = defaultdict(lambda: {"present": 0, "total": 0, "subject": "", "code": "", "time": ""})
+    from app.services.records import flatten_attendance_records, aggregate_attendance_sessions
+    import pandas as pd
 
-    for r in records:
-        ts = r.get("timestamp")
-        ts_group = ts.split(".")[0] if ts else None
-        key = (ts_group, r["subjects"]["subject_id"])
-        entry = sessions_map[key]
-        entry["total"] += 1
-        if r.get("is_present"):
-            entry["present"] += 1
-        entry["subject"] = r["subjects"]["name"]
-        entry["code"] = r["subjects"]["subject_code"]
-        if ts:
-            entry["time"] = datetime.fromisoformat(ts).strftime("%Y-%m-%d %I:%M %p")
+    data = flatten_attendance_records(records)
+    df = pd.DataFrame(data)
+    summary = aggregate_attendance_sessions(df)
 
     sessions = [
         AttendanceSessionSummary(
-            Time=v["time"],
-            Subject=v["subject"],
-            Subject_Code=v["code"],
-            Attendance_Stats=f"\u2705 {v['present']} /{v['total']} Students",
+            Time=row["Time"],
+            Subject=row["Subject"],
+            Subject_Code=row["Subject Code"],
+            Attendance_Stats=row["Attendance Stats"],
         )
-        for v in sessions_map.values()
+        for _, row in summary.iterrows()
     ]
     return AttendanceRecordsResponse(sessions=sessions)

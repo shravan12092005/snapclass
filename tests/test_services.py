@@ -315,5 +315,167 @@ class TestValidatePassword(unittest.TestCase):
         self.assertIn("lowercase", err)
 
 
+# ---------------------------------------------------------------------------
+# flatten_attendance_records / filter / aggregate / student stats
+# ---------------------------------------------------------------------------
+
+from datetime import date
+from src.services.records import (
+    flatten_attendance_records,
+    filter_records_by_date,
+    aggregate_attendance_sessions,
+    compute_student_subject_stats,
+)
+
+
+class TestFlattenAttendanceRecords(unittest.TestCase):
+
+    def test_basic_flatten(self):
+        records = [
+            {
+                "timestamp": "2024-03-15T10:00:00",
+                "is_present": True,
+                "subjects": {"name": "Math", "subject_code": "MATH101"},
+            },
+            {
+                "timestamp": "2024-03-15T10:00:00",
+                "is_present": False,
+                "subjects": {"name": "Math", "subject_code": "MATH101"},
+            },
+        ]
+        data = flatten_attendance_records(records)
+        self.assertEqual(len(data), 2)
+        self.assertEqual(data[0]["ts_group"], "2024-03-15T10:00:00")
+        self.assertEqual(data[0]["Subject"], "Math")
+        self.assertEqual(data[0]["Subject Code"], "MATH101")
+        self.assertTrue(data[0]["is_present"])
+        self.assertFalse(data[1]["is_present"])
+        self.assertIn("2024-03-15", data[0]["Time"])
+
+    def test_empty_records(self):
+        self.assertEqual(flatten_attendance_records([]), [])
+
+    def test_timestamp_with_fractional_seconds(self):
+        records = [
+            {
+                "timestamp": "2024-03-15T10:00:00.123456",
+                "is_present": True,
+                "subjects": {"name": "A", "subject_code": "A1"},
+            }
+        ]
+        data = flatten_attendance_records(records)
+        # ts_group strips fractional seconds
+        self.assertEqual(data[0]["ts_group"], "2024-03-15T10:00:00")
+
+
+class TestFilterRecordsByDate(unittest.TestCase):
+
+    def test_filter_in_range(self):
+        import pandas as pd
+        df = pd.DataFrame([
+            {"ts_group": "2024-03-10T10:00:00", "x": 1},
+            {"ts_group": "2024-03-15T10:00:00", "x": 2},
+            {"ts_group": "2024-03-20T10:00:00", "x": 3},
+        ])
+        result = filter_records_by_date(df, date(2024, 3, 12), date(2024, 3, 18))
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result.iloc[0]["x"], 2)
+
+    def test_inclusive_boundaries(self):
+        import pandas as pd
+        df = pd.DataFrame([
+            {"ts_group": "2024-03-10T10:00:00", "x": 1},
+            {"ts_group": "2024-03-15T10:00:00", "x": 2},
+        ])
+        result = filter_records_by_date(df, date(2024, 3, 10), date(2024, 3, 10))
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result.iloc[0]["x"], 1)
+
+
+class TestAggregateAttendanceSessions(unittest.TestCase):
+
+    def test_basic_aggregation(self):
+        import pandas as pd
+        df = pd.DataFrame([
+            {"ts_group": "2024-03-15T10:00:00", "Time": "2024-03-15 10:00 AM",
+             "Subject": "Math", "Subject Code": "M101", "is_present": True},
+            {"ts_group": "2024-03-15T10:00:00", "Time": "2024-03-15 10:00 AM",
+             "Subject": "Math", "Subject Code": "M101", "is_present": False},
+            {"ts_group": "2024-03-15T10:00:00", "Time": "2024-03-15 10:00 AM",
+             "Subject": "Math", "Subject Code": "M101", "is_present": True},
+        ])
+        summary = aggregate_attendance_sessions(df)
+        self.assertEqual(len(summary), 1)
+        self.assertEqual(summary.iloc[0]["Present_Count"], 2)
+        self.assertEqual(summary.iloc[0]["Total_Count"], 3)
+        self.assertIn("2 /3", summary.iloc[0]["Attendance Stats"])
+
+    def test_multiple_sessions(self):
+        import pandas as pd
+        df = pd.DataFrame([
+            {"ts_group": "T1", "Time": "Time1", "Subject": "A", "Subject Code": "A1", "is_present": True},
+            {"ts_group": "T2", "Time": "Time2", "Subject": "B", "Subject Code": "B1", "is_present": False},
+        ])
+        summary = aggregate_attendance_sessions(df)
+        self.assertEqual(len(summary), 2)
+
+
+class TestComputeStudentSubjectStats(unittest.TestCase):
+
+    def test_basic_stats(self):
+        dashboard_data = [
+            {
+                "subjects": {
+                    "subject_id": 1, "subject_code": "M101",
+                    "name": "Math", "section": "A",
+                    "attendance_logs": [
+                        {"is_present": True},
+                        {"is_present": True},
+                        {"is_present": False},
+                    ]
+                }
+            }
+        ]
+        stats = compute_student_subject_stats(dashboard_data)
+        self.assertEqual(len(stats), 1)
+        self.assertEqual(stats[0]["total"], 3)
+        self.assertEqual(stats[0]["attended"], 2)
+        self.assertAlmostEqual(stats[0]["percentage"], 66.666, places=2)
+
+    def test_no_logs(self):
+        dashboard_data = [
+            {
+                "subjects": {
+                    "subject_id": 1, "subject_code": "X",
+                    "name": "X", "section": "A",
+                    "attendance_logs": []
+                }
+            }
+        ]
+        stats = compute_student_subject_stats(dashboard_data)
+        self.assertEqual(stats[0]["total"], 0)
+        self.assertEqual(stats[0]["percentage"], 0.0)
+
+    def test_empty_data(self):
+        self.assertEqual(compute_student_subject_stats([]), [])
+        self.assertEqual(compute_student_subject_stats(None), [])
+
+    def test_perfect_attendance(self):
+        dashboard_data = [
+            {
+                "subjects": {
+                    "subject_id": 5, "subject_code": "P",
+                    "name": "Physics", "section": "B",
+                    "attendance_logs": [
+                        {"is_present": True},
+                        {"is_present": True},
+                    ]
+                }
+            }
+        ]
+        stats = compute_student_subject_stats(dashboard_data)
+        self.assertEqual(stats[0]["percentage"], 100.0)
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -15,6 +15,7 @@ from app.services.db import (
     unenroll_student_to_subject,
 )
 from app.services.face_pipeline import train_classifier
+from app.services.records import compute_student_subject_stats
 
 router = APIRouter(prefix="/api/student", tags=["student"])
 
@@ -28,27 +29,20 @@ def student_dashboard_route(request: Request):
         raise HTTPException(404, "Student not found")
 
     dashboard_data = get_student_dashboard_data(student_id)
+    subject_stats = compute_student_subject_stats(dashboard_data)
 
-    subjects = []
-    for node in (dashboard_data or []):
-        sub = node["subjects"]
-        logs = sub.get("attendance_logs", [])
-
-        total = len(logs)
-        attended = sum(1 for log in logs if log.get("is_present"))
-        rate = (attended / total * 100) if total > 0 else 0.0
-
-        subjects.append(
-            StudentDashboardSubject(
-                subject_id=sub["subject_id"],
-                subject_code=sub["subject_code"],
-                name=sub["name"],
-                section=sub["section"],
-                total=total,
-                attended=attended,
-                rate=round(rate, 1),
-            )
+    subjects = [
+        StudentDashboardSubject(
+            subject_id=s["subject_id"],
+            subject_code=s["subject_code"],
+            name=s["name"],
+            section=s["section"],
+            total=s["total"],
+            attended=s["attended"],
+            rate=round(s["percentage"], 1),
         )
+        for s in subject_stats
+    ]
 
     return StudentDashboardResponse(
         student=StudentResponseRef(student_id=student["student_id"], name=student["name"]),
