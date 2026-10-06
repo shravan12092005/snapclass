@@ -119,3 +119,8 @@ venv.bak/
 *.swp
 *.swo
 .DS_Store
+
+# Node / Frontend
+node_modules/
+.next/
+out/

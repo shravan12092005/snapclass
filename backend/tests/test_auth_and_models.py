@@ -8,6 +8,9 @@ Verifies:
 
 import os
 os.environ.setdefault("DEV_MODE", "true")
+os.environ.setdefault("SUPABASE_URL", "https://mock.supabase.co")
+os.environ.setdefault("SUPABASE_KEY", "mock-supabase-key")
+os.environ.setdefault("SUPABASE_SERVICE_ROLE_KEY", "mock-service-role-key")
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -98,6 +101,42 @@ class TestSessionAuth(unittest.TestCase):
 
         teacher_id = require_teacher(request)
         self.assertEqual(teacher_id, 7)
+
+    def test_get_current_user_me_unauthenticated(self):
+        from app.routers.auth import get_current_user_route
+        request = MagicMock()
+        request.cookies = {}
+        res = get_current_user_route(request)
+        self.assertFalse(res["authenticated"])
+        self.assertIsNone(res["role"])
+
+    def test_get_current_user_me_authenticated_teacher(self):
+        from app.routers.auth import get_current_user_route
+        response = Response()
+        create_session(response, "teacher", 7)
+        token = response.headers["set-cookie"].split("=", 1)[1].split(";")[0]
+
+        request = MagicMock()
+        request.cookies = {SESSION_COOKIE_NAME: token}
+        res = get_current_user_route(request)
+        self.assertTrue(res["authenticated"])
+        self.assertEqual(res["role"], "teacher")
+        self.assertEqual(res["user"]["teacher_id"], 7)
+
+    def test_get_current_user_me_authenticated_student(self):
+        from app.routers.auth import get_current_user_route
+        response = Response()
+        create_session(response, "student", 42)
+        token = response.headers["set-cookie"].split("=", 1)[1].split(";")[0]
+
+        request = MagicMock()
+        request.cookies = {SESSION_COOKIE_NAME: token}
+        with patch("app.routers.auth.get_student_by_id", return_value={"student_id": 42, "name": "Bob"}):
+            res = get_current_user_route(request)
+        self.assertTrue(res["authenticated"])
+        self.assertEqual(res["role"], "student")
+        self.assertEqual(res["user"]["student_id"], 42)
+        self.assertEqual(res["user"]["name"], "Bob")
 
 
 # ---------------------------------------------------------------------------

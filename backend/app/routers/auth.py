@@ -10,7 +10,7 @@ import numpy as np
 from fastapi import APIRouter, File, Form, HTTPException, Request, Response, UploadFile
 from PIL import Image, ImageOps
 
-from app.auth import create_session, destroy_session, require_student, require_teacher
+from app.auth import create_session, destroy_session, get_session, require_student, require_teacher
 from app.lockout import (
     check_lockout,
     get_client_ip,
@@ -227,3 +227,54 @@ async def student_register_route(
 def logout_route(response: Response):
     destroy_session(response)
     return MessageResponse(message="Logged out")
+
+
+@router.get("/me")
+def get_current_user_route(request: Request):
+    """Return the current user's role and profile derived from session cookie."""
+    try:
+        session = get_session(request)
+    except HTTPException:
+        return {"authenticated": False, "role": None, "user": None}
+
+    user_type = session.get("type")
+    user_id = session.get("id")
+
+    if user_type == "student":
+        student = get_student_by_id(user_id)
+        if not student:
+            return {"authenticated": False, "role": None, "user": None}
+        return {
+            "authenticated": True,
+            "role": "student",
+            "user": {"student_id": student["student_id"], "name": student["name"]},
+        }
+    elif user_type == "teacher":
+        from app.config import supabase
+        try:
+            res = (
+                supabase.table("teachers")
+                .select("teacher_id, username, name")
+                .eq("teacher_id", user_id)
+                .execute()
+            )
+            if res.data:
+                t = res.data[0]
+                return {
+                    "authenticated": True,
+                    "role": "teacher",
+                    "user": {
+                        "teacher_id": t["teacher_id"],
+                        "username": t["username"],
+                        "name": t["name"],
+                    },
+                }
+        except Exception:
+            pass
+        return {
+            "authenticated": True,
+            "role": "teacher",
+            "user": {"teacher_id": user_id, "username": "", "name": "Teacher"},
+        }
+
+    return {"authenticated": False, "role": None, "user": None}
