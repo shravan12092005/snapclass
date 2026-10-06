@@ -103,10 +103,11 @@ ipython_config.py
 # virtualenv
 venv/
 .venv/
-.streamlit/
+.streamlit/secrets.toml
 dist/
-*. pyc
-• DS_Store
+*.pyc
+.DS_Store
+__MACOSX/
 env/
 ENV/
 env.bak/
