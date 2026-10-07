@@ -51,6 +51,82 @@ async function fetchJson<T>(url: string, options: RequestInit = {}): Promise<T> 
   return res.json() as Promise<T>;
 }
 
+export interface UploadOptions {
+  signal?: AbortSignal;
+  onProgress?: (percent: number) => void;
+}
+
+function uploadWithProgress<T>(
+  url: string,
+  formData: FormData,
+  options: UploadOptions = {}
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", url, true);
+    xhr.withCredentials = true;
+    xhr.setRequestHeader("Accept", "application/json");
+
+    if (options.signal) {
+      if (options.signal.aborted) {
+        return reject(new DOMException("Aborted", "AbortError"));
+      }
+      options.signal.addEventListener("abort", () => {
+        xhr.abort();
+        reject(new DOMException("Aborted", "AbortError"));
+      });
+    }
+
+    if (xhr.upload && options.onProgress) {
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable && e.total > 0) {
+          const percent = Math.min(100, Math.round((e.loaded / e.total) * 100));
+          options.onProgress?.(percent);
+        }
+      };
+    }
+
+    xhr.onload = () => {
+      let data: any = null;
+      try {
+        data = JSON.parse(xhr.responseText);
+      } catch {
+        // Not JSON
+      }
+
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(data as T);
+      } else {
+        let errorDetail = xhr.statusText;
+        if (data && data.detail) {
+          errorDetail = typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail);
+        }
+        reject(
+          new ApiError(
+            errorDetail || `Request failed with status ${xhr.status}`,
+            xhr.status,
+            data
+          )
+        );
+      }
+    };
+
+    xhr.onerror = () => {
+      reject(new ApiError("Network error. Please check your connection.", 0));
+    };
+
+    xhr.onabort = () => {
+      reject(new DOMException("Aborted", "AbortError"));
+    };
+
+    xhr.ontimeout = () => {
+      reject(new ApiError("Request timed out.", 408));
+    };
+
+    xhr.send(formData);
+  });
+}
+
 export const api = {
   // -------------------------------------------------------------------------
   // Session & Auth
@@ -89,21 +165,26 @@ export const api = {
     });
   },
 
-  async loginStudentFace(imageBlob: Blob): Promise<{ message: string; user: Student }> {
+  async loginStudentFace(
+    imageBlob: Blob,
+    options?: UploadOptions
+  ): Promise<{ message: string; user: Student }> {
     const formData = new FormData();
     formData.append("image", imageBlob, "face_login.jpg");
 
-    return fetchJson<{ message: string; user: Student }>("/api/auth/student/face-login", {
-      method: "POST",
-      body: formData,
-    });
+    return uploadWithProgress<{ message: string; user: Student }>(
+      "/api/auth/student/face-login",
+      formData,
+      options
+    );
   },
 
   async registerStudent(
     name: string,
     consent: boolean,
     imageBlob: Blob,
-    audioBlob?: Blob | null
+    audioBlob?: Blob | null,
+    options?: UploadOptions
   ): Promise<{ message: string; user: Student }> {
     const formData = new FormData();
     formData.append("name", name);
@@ -113,10 +194,11 @@ export const api = {
       formData.append("audio", audioBlob, "voice_sample.webm");
     }
 
-    return fetchJson<{ message: string; user: Student }>("/api/auth/student/register", {
-      method: "POST",
-      body: formData,
-    });
+    return uploadWithProgress<{ message: string; user: Student }>(
+      "/api/auth/student/register",
+      formData,
+      options
+    );
   },
 
   async logout(): Promise<{ message: string }> {
@@ -165,7 +247,11 @@ export const api = {
   // -------------------------------------------------------------------------
   // Attendance (Teacher)
   // -------------------------------------------------------------------------
-  async scanFaceAttendance(subjectId: number, images: (Blob | File)[]): Promise<FaceAttendanceResponse> {
+  async scanFaceAttendance(
+    subjectId: number,
+    images: (Blob | File)[],
+    options?: UploadOptions
+  ): Promise<FaceAttendanceResponse> {
     const formData = new FormData();
     for (let i = 0; i < images.length; i++) {
       const file = images[i];
@@ -173,28 +259,38 @@ export const api = {
       formData.append("images", file, filename);
     }
 
-    return fetchJson<FaceAttendanceResponse>(`/api/attendance/face?subject_id=${subjectId}`, {
-      method: "POST",
-      body: formData,
-    });
+    return uploadWithProgress<FaceAttendanceResponse>(
+      `/api/attendance/face?subject_id=${subjectId}`,
+      formData,
+      options
+    );
   },
 
-  async scanVoiceAttendance(subjectId: number, audio: Blob | File): Promise<VoiceAttendanceResponse> {
+  async scanVoiceAttendance(
+    subjectId: number,
+    audio: Blob | File,
+    options?: UploadOptions
+  ): Promise<VoiceAttendanceResponse> {
     const formData = new FormData();
     const filename = (audio as File).name || "classroom_audio.webm";
     formData.append("audio", audio, filename);
 
-    return fetchJson<VoiceAttendanceResponse>(`/api/attendance/voice?subject_id=${subjectId}`, {
-      method: "POST",
-      body: formData,
-    });
+    return uploadWithProgress<VoiceAttendanceResponse>(
+      `/api/attendance/voice?subject_id=${subjectId}`,
+      formData,
+      options
+    );
   },
 
-  async saveAttendance(logs: AttendanceLogEntry[]): Promise<{ message: string }> {
+  async saveAttendance(
+    logs: AttendanceLogEntry[],
+    options?: { signal?: AbortSignal }
+  ): Promise<{ message: string }> {
     return fetchJson<{ message: string }>("/api/attendance/save", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ logs }),
+      signal: options?.signal,
     });
   },
 

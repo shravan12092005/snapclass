@@ -1,24 +1,22 @@
-"use client";
-
 import React, { useState, useEffect, useRef } from "react";
 import { Subject, AttendanceResultEntry, AttendanceLogEntry } from "@/types";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import {
   Camera,
   Mic,
   Upload,
   Trash2,
-  Play,
   Square,
   RefreshCw,
   Sparkles,
   AlertCircle,
-  Loader2,
   Video,
-  CheckCircle2,
   HelpCircle,
 } from "lucide-react";
 import AttendanceReviewModal from "./AttendanceReviewModal";
+import ProcessingOverlay from "@/components/ProcessingOverlay";
+import { useProcessing } from "@/hooks/useProcessing";
+import { scaleImageFile } from "@/lib/imageUtils";
 
 interface TakeAttendanceTabProps {
   subjects: Subject[];
@@ -54,11 +52,25 @@ export default function TakeAttendanceTab({
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Analysis / Review State
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
   const [reviewResults, setReviewResults] = useState<AttendanceResultEntry[]>([]);
   const [reviewLogs, setReviewLogs] = useState<AttendanceLogEntry[]>([]);
+
+  const {
+    isProcessing,
+    title,
+    subMessage,
+    elapsedSeconds,
+    uploadPercent,
+    allowCancel,
+    isTimedOut,
+    startProcessing,
+    stopProcessing,
+    setUploadPercent,
+    cancel,
+    retry,
+  } = useProcessing();
 
   // Automatically select first subject if available
   useEffect(() => {
@@ -192,34 +204,112 @@ export default function TakeAttendanceTab({
     }
 
     setErrorMsg("");
-    setIsAnalyzing(true);
 
-    try {
-      if (activeMode === "face") {
-        if (stagedPhotos.length === 0) {
-          setErrorMsg("Please upload or snap at least one classroom photo.");
-          setIsAnalyzing(false);
-          return;
-        }
-        const resp = await api.scanFaceAttendance(Number(selectedSubjectId), stagedPhotos);
-        setReviewResults(resp.results);
-        setReviewLogs(resp.logs);
-        setReviewModalOpen(true);
-      } else {
-        if (!audioBlob) {
-          setErrorMsg("Please record or upload an audio file first.");
-          setIsAnalyzing(false);
-          return;
-        }
-        const resp = await api.scanVoiceAttendance(Number(selectedSubjectId), audioBlob);
-        setReviewResults(resp.results);
-        setReviewLogs(resp.logs);
-        setReviewModalOpen(true);
+    if (activeMode === "face") {
+      if (stagedPhotos.length === 0) {
+        setErrorMsg("Please upload or snap at least one classroom photo.");
+        return;
       }
-    } catch (err: any) {
-      setErrorMsg(err.message || "Failed to analyze attendance. Please check that students are enrolled.");
-    } finally {
-      setIsAnalyzing(false);
+
+      const count = stagedPhotos.length;
+      const countMsg =
+        count === 1
+          ? "Analyzing 1 classroom photo… this can take up to a minute for large classes"
+          : `Analyzing ${count} photos… this can take up to a minute for large classes`;
+
+      const signal = startProcessing({
+        title: "Scanning Classroom Faces with AI",
+        steps: [
+          "Uploading photos…",
+          countMsg,
+          "Detecting faces and computing embeddings…",
+          "Matching with enrolled roster…",
+        ],
+        allowCancel: true,
+        onRetry: handleRunAnalysis,
+      });
+
+      try {
+        // Downscale photos client-side to max 1280px before uploading
+        const scaledPhotos = await Promise.all(
+          stagedPhotos.map((file) => scaleImageFile(file, 1280))
+        );
+
+        const resp = await api.scanFaceAttendance(Number(selectedSubjectId), scaledPhotos, {
+          signal,
+          onProgress: (pct) => setUploadPercent(pct),
+        });
+
+        stopProcessing();
+        setReviewResults(resp.results);
+        setReviewLogs(resp.logs);
+        setReviewModalOpen(true);
+      } catch (err: any) {
+        stopProcessing();
+        if (err.name === "AbortError") {
+          setErrorMsg("Face recognition scan was cancelled.");
+          return;
+        }
+        if (err instanceof ApiError) {
+          if (err.status === 400) {
+            setErrorMsg(err.message || "No faces detected in the photos, or photo quality too low.");
+          } else if (err.status === 401) {
+            setErrorMsg("Session expired or unauthorized. Please re-authenticate.");
+          } else if (err.status === 429) {
+            setErrorMsg(err.message || "Too many requests. Please wait a moment before running another analysis.");
+          } else if (err.status === 503) {
+            setErrorMsg("The AI biometric service is temporarily unavailable. Please try again in a moment.");
+          } else {
+            setErrorMsg(err.message);
+          }
+        } else {
+          setErrorMsg("Network error during facial recognition scan. Please check your connection.");
+        }
+      }
+    } else {
+      // Voice mode
+      if (!audioBlob) {
+        setErrorMsg("Please record or upload an audio file first.");
+        return;
+      }
+
+      const signal = startProcessing({
+        title: "Processing Classroom Voice Roll Call",
+        steps: [
+          "Uploading audio…",
+          "Converting audio…",
+          "Matching voices…",
+        ],
+        allowCancel: true,
+        onRetry: handleRunAnalysis,
+      });
+
+      try {
+        const resp = await api.scanVoiceAttendance(Number(selectedSubjectId), audioBlob, {
+          signal,
+          onProgress: (pct) => setUploadPercent(pct),
+        });
+
+        stopProcessing();
+        setReviewResults(resp.results);
+        setReviewLogs(resp.logs);
+        setReviewModalOpen(true);
+      } catch (err: any) {
+        stopProcessing();
+        if (err.name === "AbortError") {
+          setErrorMsg("Voice recognition scan was cancelled.");
+          return;
+        }
+        if (err instanceof ApiError) {
+          if (err.status === 503) {
+            setErrorMsg("The voice biometric service is temporarily unavailable. Please try again in a moment.");
+          } else {
+            setErrorMsg(err.message);
+          }
+        } else {
+          setErrorMsg("Network error during voice recognition scan. Please check your connection.");
+        }
+      }
     }
   };
 
@@ -288,7 +378,20 @@ export default function TakeAttendanceTab({
       </div>
 
       {/* Flattened Mode Selection: Single Clear Choice */}
-      <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-xs overflow-hidden">
+      <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-xs overflow-hidden relative">
+        {/* Processing Feedback Overlay */}
+        <ProcessingOverlay
+          isProcessing={isProcessing}
+          title={title}
+          subMessage={subMessage}
+          elapsedSeconds={elapsedSeconds}
+          uploadPercent={uploadPercent}
+          allowCancel={allowCancel}
+          isTimedOut={isTimedOut}
+          onCancel={cancel}
+          onRetry={retry}
+        />
+
         <div className="p-3 border-b border-[#E2E8F0] bg-[#F8FAFC]">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <button
@@ -439,7 +542,8 @@ export default function TakeAttendanceTab({
                   <button
                     type="button"
                     onClick={clearAllPhotos}
-                    className="text-xs font-medium text-[#B91C1C] hover:underline flex items-center gap-1"
+                    disabled={isProcessing}
+                    className="text-xs font-medium text-[#B91C1C] hover:underline flex items-center gap-1 disabled:opacity-50"
                   >
                     <Trash2 className="h-3 w-3" />
                     <span>Clear all</span>
@@ -449,6 +553,10 @@ export default function TakeAttendanceTab({
                 <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
                   {stagedPhotos.map((file, idx) => {
                     const objectUrl = URL.createObjectURL(file);
+                    const sizeStr =
+                      file.size > 1024 * 1024
+                        ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
+                        : `${Math.round(file.size / 1024)} KB`;
                     return (
                       <div
                         key={idx}
@@ -464,6 +572,7 @@ export default function TakeAttendanceTab({
                           <button
                             type="button"
                             onClick={() => removePhoto(idx)}
+                            disabled={isProcessing}
                             className="p-1.5 rounded-lg bg-white/90 text-[#B91C1C] hover:bg-white transition-colors"
                             title="Remove photo"
                           >
@@ -472,6 +581,9 @@ export default function TakeAttendanceTab({
                         </div>
                         <div className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/60 text-white text-[10px] font-medium">
                           #{idx + 1}
+                        </div>
+                        <div className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-black/60 text-white text-[10px] font-mono">
+                          {sizeStr}
                         </div>
                       </div>
                     );
@@ -485,20 +597,11 @@ export default function TakeAttendanceTab({
               <button
                 type="button"
                 onClick={handleRunAnalysis}
-                disabled={isAnalyzing || stagedPhotos.length === 0}
+                disabled={isProcessing || stagedPhotos.length === 0}
                 className="w-full sm:w-auto px-6 py-3 rounded-xl bg-[#4F46E5] hover:bg-[#4338CA] disabled:bg-[#CBD5E1] disabled:text-[#475569] disabled:cursor-not-allowed disabled:shadow-none text-white text-xs font-bold shadow-xs transition-colors flex items-center justify-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]"
               >
-                {isAnalyzing ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Scanning Classroom Faces with AI…</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="h-4 w-4" />
-                    <span>Run Face Analysis ({stagedPhotos.length} photos)</span>
-                  </>
-                )}
+                <Sparkles className="h-4 w-4" />
+                <span>Run Face Analysis ({stagedPhotos.length} {stagedPhotos.length === 1 ? "photo" : "photos"})</span>
               </button>
             </div>
           </div>
@@ -553,7 +656,6 @@ export default function TakeAttendanceTab({
               {/* Playback preview */}
               {audioUrl && !isRecording && (
                 <div className="w-full max-w-md pt-2">
-                  {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
                   <audio src={audioUrl} controls className="w-full h-10 rounded-lg" />
                 </div>
               )}
@@ -577,20 +679,11 @@ export default function TakeAttendanceTab({
               <button
                 type="button"
                 onClick={handleRunAnalysis}
-                disabled={isAnalyzing || !audioBlob}
+                disabled={isProcessing || !audioBlob}
                 className="w-full sm:w-auto px-6 py-3 rounded-xl bg-[#4F46E5] hover:bg-[#4338CA] disabled:bg-[#CBD5E1] disabled:text-[#475569] disabled:cursor-not-allowed disabled:shadow-none text-white text-xs font-bold shadow-xs transition-colors flex items-center justify-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]"
               >
-                {isAnalyzing ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Processing Audio & Verifying Speaker Vectors…</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="h-4 w-4" />
-                    <span>Analyze Voice Attendance</span>
-                  </>
-                )}
+                <Sparkles className="h-4 w-4" />
+                <span>Analyze Voice Attendance</span>
               </button>
             </div>
           </div>

@@ -5,14 +5,17 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { api, ApiError } from "@/lib/api";
 import CameraCapture from "@/components/CameraCapture";
+import ProcessingOverlay from "@/components/ProcessingOverlay";
+import { useProcessing } from "@/hooks/useProcessing";
+import { scaleImageBlob } from "@/lib/imageUtils";
 import {
   UserCheck,
   AlertCircle,
   ShieldAlert,
   ServerCrash,
-  Loader2,
   ArrowLeft,
   LogIn,
+  RotateCcw,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -21,10 +24,26 @@ export default function StudentFaceLoginPage() {
   const { refreshAuth } = useAuth();
 
   const [capturedBlob, setCapturedBlob] = useState<Blob | null>(null);
-  const [isVerifying, setIsVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lockoutRemaining, setLockoutRemaining] = useState<number | null>(null);
   const [isServiceDown, setIsServiceDown] = useState(false);
+
+  const {
+    isProcessing,
+    title,
+    subMessage,
+    elapsedSeconds,
+    uploadPercent,
+    allowCancel,
+    isTimedOut,
+    successMessage,
+    startProcessing,
+    stopProcessing,
+    setUploadPercent,
+    showSuccess,
+    cancel,
+    retry,
+  } = useProcessing();
 
   // Countdown timer for lockout
   useEffect(() => {
@@ -48,6 +67,13 @@ export default function StudentFaceLoginPage() {
     setIsServiceDown(false);
   }, []);
 
+  // Retake: clear blob to reset
+  const handleRetake = () => {
+    setCapturedBlob(null);
+    setError(null);
+    setIsServiceDown(false);
+  };
+
   // Step 2: User clicks "Sign in" manually
   const handleSignIn = async () => {
     if (!capturedBlob) return;
@@ -56,15 +82,40 @@ export default function StudentFaceLoginPage() {
       return;
     }
 
-    setIsVerifying(true);
     setError(null);
     setIsServiceDown(false);
 
+    const signal = startProcessing({
+      title: "Verifying Face Identity",
+      steps: [
+        "Uploading photo…",
+        "Detecting face…",
+        "Matching with enrolled students…",
+        "Signing you in…",
+      ],
+      allowCancel: true,
+      onRetry: handleSignIn,
+    });
+
     try {
-      await api.loginStudentFace(capturedBlob);
+      // Downscale photo client-side before sending to server (max 960px)
+      const scaledBlob = await scaleImageBlob(capturedBlob, 960);
+
+      const res = await api.loginStudentFace(scaledBlob, {
+        signal,
+        onProgress: (pct) => setUploadPercent(pct),
+      });
+
+      const studentName = res.user?.name || "Student";
+      await showSuccess(`Welcome back, ${studentName}`, 600);
       await refreshAuth();
       router.push("/student");
     } catch (err: any) {
+      stopProcessing();
+      if (err.name === "AbortError") {
+        setError("Face sign-in cancelled.");
+        return;
+      }
       if (err instanceof ApiError) {
         if (err.status === 503) {
           setIsServiceDown(true);
@@ -80,23 +131,28 @@ export default function StudentFaceLoginPage() {
       } else {
         setError("Network error while connecting to the authentication service.");
       }
-    } finally {
-      setIsVerifying(false);
     }
-  };
-
-  // Retake: clear blob to reset
-  const handleRetake = () => {
-    setCapturedBlob(null);
-    setError(null);
-    setIsServiceDown(false);
   };
 
   const isLockedOut = lockoutRemaining !== null && lockoutRemaining > 0;
 
   return (
     <div className="min-h-[75vh] flex flex-col items-center justify-center py-6 px-4">
-      <div className="w-full max-w-lg bg-white rounded-2xl border border-[#E2E8F0] shadow-sm p-6 sm:p-8">
+      <div className="w-full max-w-lg bg-white rounded-2xl border border-[#E2E8F0] shadow-sm p-6 sm:p-8 relative overflow-hidden">
+        {/* Processing Feedback Overlay */}
+        <ProcessingOverlay
+          isProcessing={isProcessing}
+          title={title}
+          subMessage={subMessage}
+          elapsedSeconds={elapsedSeconds}
+          uploadPercent={uploadPercent}
+          allowCancel={allowCancel}
+          isTimedOut={isTimedOut}
+          successMessage={successMessage}
+          onCancel={cancel}
+          onRetry={retry}
+        />
+
         {/* Header Icon */}
         <div className="text-center mb-6">
           <div className="inline-flex h-12 w-12 rounded-xl bg-[#ECFDF5] border border-[#A7F3D0] items-center justify-center text-[#047857] mb-3">
@@ -154,27 +210,28 @@ export default function StudentFaceLoginPage() {
             title=""
             subtitle=""
           />
-
-          {isVerifying && (
-            <div className="absolute inset-0 bg-white/80 backdrop-blur-xs rounded-2xl flex flex-col items-center justify-center z-20">
-              <Loader2 className="h-8 w-8 text-[#4F46E5] animate-spin mb-2" />
-              <p className="text-sm font-bold text-[#0F172A]">Analyzing Facial Landmarks…</p>
-              <p className="text-xs text-[#64748B] mt-1">Matching biometric facial features</p>
-            </div>
-          )}
         </div>
 
         {/* Sign In / Retake button row — only visible when photo captured */}
-        {capturedBlob && !isVerifying && (
-          <div className="mt-5 flex items-center justify-center gap-3">
+        {capturedBlob && !isProcessing && (
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
             <button
               type="button"
               onClick={handleSignIn}
-              disabled={isLockedOut}
-              className="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-bold rounded-xl bg-[#4F46E5] text-white hover:bg-[#4338CA] shadow-sm disabled:opacity-50 transition-all hover:scale-[1.02]"
+              disabled={isLockedOut || isProcessing}
+              className="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-bold rounded-xl bg-[#4F46E5] text-white hover:bg-[#4338CA] shadow-sm disabled:opacity-50 transition-all hover:scale-[1.02] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]"
             >
               <LogIn className="h-4 w-4" />
               <span>Sign in with this photo</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleRetake}
+              disabled={isProcessing}
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold rounded-xl border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] text-[#64748B] hover:text-[#0F172A] shadow-2xs transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              <span>Retake photo</span>
             </button>
           </div>
         )}

@@ -10,12 +10,12 @@ import {
   Search,
   Check,
   X,
-  Loader2,
   Users,
   ShieldCheck,
-  Sparkles,
 } from "lucide-react";
 import StatusBadge from "@/components/StatusBadge";
+import ProcessingOverlay from "@/components/ProcessingOverlay";
+import { useProcessing } from "@/hooks/useProcessing";
 
 interface AttendanceReviewModalProps {
   isOpen: boolean;
@@ -38,9 +38,23 @@ export default function AttendanceReviewModal({
   const [logs, setLogs] = useState<AttendanceLogEntry[]>(initialLogs);
   const [filter, setFilter] = useState<"all" | "present" | "absent">("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
-  const [savedSuccess, setSavedSuccess] = useState(false);
+
+  const {
+    isProcessing,
+    title,
+    subMessage,
+    elapsedSeconds,
+    uploadPercent,
+    allowCancel,
+    isTimedOut,
+    successMessage,
+    startProcessing,
+    stopProcessing,
+    showSuccess,
+    cancel,
+    retry,
+  } = useProcessing();
 
   // Sync if initialLogs change
   React.useEffect(() => {
@@ -97,20 +111,21 @@ export default function AttendanceReviewModal({
 
   // Save to DB
   const handleConfirmSave = async () => {
-    setIsSaving(true);
     setErrorMsg("");
+    const signal = startProcessing({
+      title: "Saving Attendance",
+      steps: ["Saving attendance…"],
+      allowCancel: false,
+    });
+
     try {
-      await api.saveAttendance(logs);
-      setSavedSuccess(true);
-      setTimeout(() => {
-        setSavedSuccess(false);
-        onSaved();
-        onClose();
-      }, 1200);
+      await api.saveAttendance(logs, { signal });
+      await showSuccess("Attendance session saved!", 600);
+      onSaved();
+      onClose();
     } catch (err: any) {
+      stopProcessing();
       setErrorMsg(err.message || "Failed to save attendance logs. Please retry.");
-    } finally {
-      setIsSaving(false);
     }
   };
 
@@ -118,7 +133,21 @@ export default function AttendanceReviewModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+      <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 relative">
+        {/* Processing Feedback Overlay */}
+        <ProcessingOverlay
+          isProcessing={isProcessing}
+          title={title}
+          subMessage={subMessage}
+          elapsedSeconds={elapsedSeconds}
+          uploadPercent={uploadPercent}
+          allowCancel={allowCancel}
+          isTimedOut={isTimedOut}
+          successMessage={successMessage}
+          onCancel={cancel}
+          onRetry={retry}
+        />
+
         {/* Modal Header */}
         <div className="px-6 py-4 border-b border-[#E2E8F0] flex items-center justify-between bg-[#F8FAFC]">
           <div className="flex items-center gap-3">
@@ -135,7 +164,7 @@ export default function AttendanceReviewModal({
           <button
             type="button"
             onClick={onClose}
-            disabled={isSaving}
+            disabled={isProcessing}
             className="p-1.5 rounded-lg text-[#64748B] hover:text-[#0F172A] hover:bg-[#E2E8F0] transition-colors"
             aria-label="Close review modal"
           >
@@ -300,7 +329,7 @@ export default function AttendanceReviewModal({
                     <button
                       type="button"
                       onClick={() => handleToggleStatus(log.student_id)}
-                      disabled={isSaving}
+                      disabled={isProcessing}
                       className={`w-full py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors ${
                         log.is_present
                           ? "bg-white text-[#B91C1C] border border-[#FECACA] hover:bg-[#FEF2F2]"
@@ -331,8 +360,8 @@ export default function AttendanceReviewModal({
           <button
             type="button"
             onClick={onClose}
-            disabled={isSaving}
-            className="w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-semibold text-[#64748B] hover:text-[#0F172A] border border-[#E2E8F0] bg-white hover:bg-[#F1F5F9] transition-colors"
+            disabled={isProcessing}
+            className="w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-semibold text-[#64748B] hover:text-[#0F172A] border border-[#E2E8F0] bg-white hover:bg-[#F1F5F9] transition-colors disabled:opacity-50"
           >
             Discard Session
           </button>
@@ -340,25 +369,11 @@ export default function AttendanceReviewModal({
           <button
             type="button"
             onClick={handleConfirmSave}
-            disabled={isSaving || savedSuccess}
-            className="w-full sm:w-auto px-6 py-2 rounded-xl text-xs font-bold text-white bg-[#4F46E5] hover:bg-[#4338CA] shadow-2xs transition-colors flex items-center justify-center gap-2"
+            disabled={isProcessing}
+            className="w-full sm:w-auto px-6 py-2 rounded-xl text-xs font-bold text-white bg-[#4F46E5] hover:bg-[#4338CA] shadow-2xs transition-colors flex items-center justify-center gap-2 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]"
           >
-            {isSaving ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Saving Attendance…</span>
-              </>
-            ) : savedSuccess ? (
-              <>
-                <Sparkles className="h-4 w-4 text-emerald-300" />
-                <span>Attendance Saved!</span>
-              </>
-            ) : (
-              <>
-                <Check className="h-4 w-4" />
-                <span>Confirm & Save Attendance</span>
-              </>
-            )}
+            <Check className="h-4 w-4" />
+            <span>Confirm & Save Attendance</span>
           </button>
         </div>
       </div>

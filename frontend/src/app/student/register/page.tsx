@@ -6,11 +6,12 @@ import { useAuth } from "@/context/AuthContext";
 import { api, ApiError } from "@/lib/api";
 import CameraCapture from "@/components/CameraCapture";
 import VoiceRecorder from "@/components/VoiceRecorder";
+import ProcessingOverlay from "@/components/ProcessingOverlay";
+import { useProcessing } from "@/hooks/useProcessing";
+import { scaleImageBlob } from "@/lib/imageUtils";
 import {
   UserPlus,
   AlertCircle,
-  Loader2,
-  CheckCircle2,
   ArrowLeft,
   Camera,
   Mic,
@@ -26,9 +27,24 @@ export default function StudentRegisterPage() {
   const [faceBlob, setFaceBlob] = useState<Blob | null>(null);
   const [voiceBlob, setVoiceBlob] = useState<Blob | null>(null);
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  const {
+    isProcessing,
+    title,
+    subMessage,
+    elapsedSeconds,
+    uploadPercent,
+    allowCancel,
+    isTimedOut,
+    successMessage: overlaySuccess,
+    startProcessing,
+    stopProcessing,
+    setUploadPercent,
+    showSuccess,
+    cancel,
+    retry,
+  } = useProcessing();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,28 +63,63 @@ export default function StudentRegisterPage() {
       return;
     }
 
-    setIsSubmitting(true);
+    const signal = startProcessing({
+      title: "Creating Biometric Profile",
+      steps: [
+        "Uploading…",
+        "Detecting face…",
+        "Creating your profile…",
+      ],
+      allowCancel: true,
+      onRetry: () => {
+        const fakeEvt = { preventDefault: () => {} } as React.FormEvent;
+        handleSubmit(fakeEvt);
+      },
+    });
+
     try {
-      const res = await api.registerStudent(name.trim(), consent, faceBlob, voiceBlob);
-      setSuccessMessage(res.message || "Profile successfully created!");
+      // Downscale face photo before upload (max 960px)
+      const scaledFace = await scaleImageBlob(faceBlob, 960);
+
+      const res = await api.registerStudent(name.trim(), consent, scaledFace, voiceBlob, {
+        signal,
+        onProgress: (pct) => setUploadPercent(pct),
+      });
+
+      await showSuccess(res.message || "Profile successfully created!", 800);
       await refreshAuth();
-      setTimeout(() => {
-        router.push("/student");
-      }, 1200);
+      router.push("/student");
     } catch (err: any) {
+      stopProcessing();
+      if (err.name === "AbortError") {
+        setError("Registration cancelled.");
+        return;
+      }
       if (err instanceof ApiError) {
         setError(err.message);
       } else {
         setError("Failed to register student profile. Please try again.");
       }
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
   return (
     <div className="min-h-[80vh] flex flex-col items-center justify-center py-6 px-4">
-      <div className="w-full max-w-xl bg-white rounded-2xl border border-[#E2E8F0] shadow-sm p-6 sm:p-8">
+      <div className="w-full max-w-xl bg-white rounded-2xl border border-[#E2E8F0] shadow-sm p-6 sm:p-8 relative overflow-hidden">
+        {/* Processing Feedback Overlay */}
+        <ProcessingOverlay
+          isProcessing={isProcessing}
+          title={title}
+          subMessage={subMessage}
+          elapsedSeconds={elapsedSeconds}
+          uploadPercent={uploadPercent}
+          allowCancel={allowCancel}
+          isTimedOut={isTimedOut}
+          successMessage={overlaySuccess}
+          onCancel={cancel}
+          onRetry={retry}
+        />
+
         {/* Header */}
         <div className="text-center mb-6">
           <div className="inline-flex h-12 w-12 rounded-xl bg-[#EEF2FF] border border-[#C7D2FE] items-center justify-center text-[#4F46E5] mb-3">
@@ -85,13 +136,6 @@ export default function StudentRegisterPage() {
           <div className="mb-6 p-3.5 rounded-xl bg-[#FEF2F2] border border-[#FECACA] flex items-start gap-2.5 text-xs text-[#B91C1C]">
             <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
             <div className="flex-1 font-medium">{error}</div>
-          </div>
-        )}
-
-        {successMessage && (
-          <div className="mb-6 p-3.5 rounded-xl bg-[#ECFDF5] border border-[#A7F3D0] flex items-start gap-2.5 text-xs text-[#047857]">
-            <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5" />
-            <div className="flex-1 font-medium">{successMessage}</div>
           </div>
         )}
 
@@ -166,17 +210,10 @@ export default function StudentRegisterPage() {
           {/* Submit */}
           <button
             type="submit"
-            disabled={isSubmitting}
-            className="w-full py-3 px-4 rounded-xl bg-[#4F46E5] hover:bg-[#4338CA] text-white text-sm font-bold shadow-xs disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+            disabled={isProcessing}
+            className="w-full py-3 px-4 rounded-xl bg-[#4F46E5] hover:bg-[#4338CA] text-white text-sm font-bold shadow-xs disabled:opacity-50 transition-all flex items-center justify-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]"
           >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Training AI Biometric Classifier…</span>
-              </>
-            ) : (
-              <span>Complete Enrollment</span>
-            )}
+            <span>Complete Enrollment</span>
           </button>
         </form>
 
