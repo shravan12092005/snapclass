@@ -44,8 +44,8 @@ IP_MAX_FAILURES = int(os.environ.get("IP_LOCKOUT_MAX_ATTEMPTS", os.environ.get("
 IP_LOCK_SECONDS = int(os.environ.get("IP_LOCKOUT_WINDOW_SECONDS", os.environ.get("LOCKOUT_IP_WINDOW_SECONDS", "600")))
 IP_WINDOW_SECONDS = int(os.environ.get("LOCKOUT_IP_WINDOW_SECONDS", os.environ.get("IP_LOCKOUT_WINDOW_SECONDS", "600")))
 
-COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "true").lower() in ("true", "1", "yes")
 DEV_MODE = os.environ.get("DEV_MODE", "").strip().lower() in ("true", "1", "yes")
+COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "false" if DEV_MODE else "true").lower() in ("true", "1", "yes")
 
 LOCKOUT_SECRET = os.environ.get("LOCKOUT_SECRET")
 if not LOCKOUT_SECRET:

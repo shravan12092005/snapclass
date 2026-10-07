@@ -23,7 +23,7 @@ if not SESSION_SECRET:
 
 SESSION_MAX_AGE = 86400 * 7  # 7 days
 SESSION_COOKIE_NAME = "snapclass_session"
-COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "true").lower() in ("true", "1", "yes")
+COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "false" if DEV_MODE else "true").lower() in ("true", "1", "yes")
 
 _serializer = URLSafeTimedSerializer(SESSION_SECRET)
 
