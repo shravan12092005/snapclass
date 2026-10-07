@@ -52,7 +52,15 @@ export default function EnrollModal({
         onClose();
       }, 1000);
     } catch (err: any) {
-      setErrorMsg(err.message || "Failed to enroll in course. Please check the code.");
+      if (err.status === 403) {
+        setErrorMsg("Student session required. You are currently signed in as a faculty member in this browser.");
+      } else if (err.status === 409) {
+        setErrorMsg("You are already enrolled in this course!");
+      } else if (err.status === 404) {
+        setErrorMsg("Course code not found. Please verify the code with your instructor.");
+      } else {
+        setErrorMsg(err.message || "Failed to enroll in course. Please check the code.");
+      }
     } finally {
       setIsSubmitting(false);
     }

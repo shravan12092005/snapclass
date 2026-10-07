@@ -39,7 +39,13 @@ export default function CreateSubjectModal({
       onSubjectCreated();
       onClose();
     } catch (err: any) {
-      setErrorMsg(err.message || "Failed to create subject. Please try again.");
+      if (err.status === 403) {
+        setErrorMsg(
+          "Teacher session required. Your active login in this browser is currently a student account (e.g. from logging into the student portal in another tab). Please sign in as a faculty member again."
+        );
+      } else {
+        setErrorMsg(err.message || "Failed to create subject. Please try again.");
+      }
     } finally {
       setIsSubmitting(false);
     }

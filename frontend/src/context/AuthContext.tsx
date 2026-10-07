@@ -40,6 +40,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     refreshAuth();
+
+    const handleSync = () => {
+      refreshAuth();
+    };
+
+    window.addEventListener("focus", handleSync);
+    document.addEventListener("visibilitychange", handleSync);
+
+    return () => {
+      window.removeEventListener("focus", handleSync);
+      document.removeEventListener("visibilitychange", handleSync);
+    };
   }, [refreshAuth]);
 
   const logout = async () => {
