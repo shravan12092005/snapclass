@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import { Subject, RosterEntry } from "@/types";
 import { X, Users, Search, Trash2, Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import StatusBadge from "@/components/StatusBadge";
+import { getAttendanceRateInfo } from "@/lib/rateColor";
 
 interface SubjectRosterModalProps {
   isOpen: boolean;
@@ -157,7 +158,9 @@ export default function SubjectRosterModal({
                 <tbody className="divide-y divide-[#E2E8F0]">
                   {filteredRoster.map((entry) => {
                     const rateNum = parseFloat(entry.Rate.replace("%", "")) || 0;
-                    const statusType = rateNum >= 75 ? "success" : rateNum >= 50 ? "warning" : "danger";
+                    const attendedParts = entry.Attended.split("/");
+                    const totalClassesForStudent = attendedParts.length > 1 ? parseInt(attendedParts[1]) || 0 : (subject.total_classes || 0);
+                    const rateInfo = getAttendanceRateInfo(rateNum, totalClassesForStudent);
 
                     return (
                       <tr key={entry.ID} className="hover:bg-[#F8FAFC] transition-colors">
@@ -167,7 +170,7 @@ export default function SubjectRosterModal({
                         </td>
                         <td className="py-2.5 px-3 text-[#0F172A]">{entry.Attended}</td>
                         <td className="py-2.5 px-3">
-                          <StatusBadge status={statusType}>{entry.Rate}</StatusBadge>
+                          <StatusBadge status={rateInfo.status}>{rateInfo.label}</StatusBadge>
                         </td>
                         <td className="py-2.5 px-3 text-right">
                           <button

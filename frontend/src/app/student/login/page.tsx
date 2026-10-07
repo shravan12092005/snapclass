@@ -159,7 +159,7 @@ export default function StudentFaceLoginPage() {
             <div className="absolute inset-0 bg-white/80 backdrop-blur-xs rounded-2xl flex flex-col items-center justify-center z-20">
               <Loader2 className="h-8 w-8 text-[#4F46E5] animate-spin mb-2" />
               <p className="text-sm font-bold text-[#0F172A]">Analyzing Facial Landmarks…</p>
-              <p className="text-xs text-[#64748B] mt-1">Comparing 128D biometric vector</p>
+              <p className="text-xs text-[#64748B] mt-1">Matching biometric facial features</p>
             </div>
           )}
         </div>

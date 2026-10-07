@@ -14,10 +14,10 @@ export default function Footer() {
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-1.5 text-[#047857]">
             <Shield className="h-3.5 w-3.5" />
-            <span className="font-medium">Encrypted Biometrics & WCAG AA Accessible</span>
+            <span className="font-medium">Biometric data is stored as numeric embeddings, never as photos.</span>
           </div>
           <span>&bull;</span>
-          <span>Signed Session Cookies</span>
+          <span>Consent-based enrolment</span>
         </div>
       </div>
     </footer>

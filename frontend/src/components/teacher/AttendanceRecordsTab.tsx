@@ -11,13 +11,13 @@ import {
   Search,
   TrendingUp,
   Users,
-  CheckCircle2,
   Clock,
   Loader2,
   AlertCircle,
   RefreshCw,
 } from "lucide-react";
 import StatusBadge from "@/components/StatusBadge";
+import { getAttendanceRateInfo } from "@/lib/rateColor";
 
 export default function AttendanceRecordsTab() {
   const [sessions, setSessions] = useState<AttendanceSessionSummary[]>([]);
@@ -100,7 +100,6 @@ export default function AttendanceRecordsTab() {
 
       // Date filtering
       if (datePreset !== "all" && (customStartDate || customEndDate)) {
-        // extract date portion from ts_group or Time
         let itemDate = "";
         if (s.ts_group) {
           itemDate = s.ts_group.split("T")[0];
@@ -142,6 +141,10 @@ export default function AttendanceRecordsTab() {
     return (totalPresentCount / totalPossibleStudents) * 100;
   }, [totalPossibleStudents, totalPresentCount]);
 
+  const avgRateInfo = useMemo(() => {
+    return getAttendanceRateInfo(avgAttendanceRate, totalSessionsCount);
+  }, [avgAttendanceRate, totalSessionsCount]);
+
   // Chart data: sort chronologically
   const chartData = useMemo(() => {
     const list = [...filteredSessions].filter((s) => s.ts_group || s.Time);
@@ -157,7 +160,6 @@ export default function AttendanceRecordsTab() {
   const handleExportCSV = () => {
     if (filteredSessions.length === 0) return;
 
-    // Headers matching Streamlit export: Time, Subject, Subject Code, Attendance Stats
     const headers = ["Time", "Subject", "Subject Code", "Attendance Stats"];
     const rows = filteredSessions.map((s) => [
       `"${(s.Time || "").replace(/"/g, '""')}"`,
@@ -189,26 +191,31 @@ export default function AttendanceRecordsTab() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
           <button
             type="button"
             onClick={fetchRecords}
             disabled={isLoading}
-            className="p-2 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] hover:bg-[#EEF2FF] text-[#64748B] hover:text-[#4F46E5] transition-colors"
+            className="p-2 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] hover:bg-[#EEF2FF] text-[#64748B] hover:text-[#4F46E5] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]"
             title="Refresh records"
           >
             <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
           </button>
 
-          <button
-            type="button"
-            onClick={handleExportCSV}
-            disabled={filteredSessions.length === 0}
-            className="flex-1 sm:flex-none px-4 py-2 rounded-xl bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-semibold shadow-2xs transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-          >
-            <Download className="h-4 w-4" />
-            <span>Export CSV ({filteredSessions.length})</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleExportCSV}
+              disabled={filteredSessions.length === 0}
+              className="px-4 py-2 rounded-xl bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-semibold shadow-2xs transition-colors flex items-center justify-center gap-2 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]"
+            >
+              <Download className="h-4 w-4" />
+              <span>Export CSV</span>
+            </button>
+            <span className="text-xs text-[#64748B] whitespace-nowrap">
+              {filteredSessions.length} {filteredSessions.length === 1 ? "session" : "sessions"}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -237,7 +244,7 @@ export default function AttendanceRecordsTab() {
                 key={key}
                 type="button"
                 onClick={() => handlePresetChange(key)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5] ${
                   datePreset === key
                     ? "bg-white text-[#4F46E5] shadow-xs border border-[#C7D2FE]"
                     : "text-[#64748B] hover:text-[#0F172A]"
@@ -254,7 +261,7 @@ export default function AttendanceRecordsTab() {
             <select
               value={selectedSubject}
               onChange={(e) => setSelectedSubject(e.target.value)}
-              className="w-full lg:w-56 px-3 py-1.5 text-xs font-semibold rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] text-[#0F172A] focus:outline-none focus:border-[#4F46E5]"
+              className="w-full lg:w-56 px-3 py-1.5 text-xs font-semibold rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] text-[#0F172A] focus:outline-none focus:border-[#4F46E5] focus-visible:ring-2 focus-visible:ring-[#4F46E5]"
             >
               <option value="all">All Subjects</option>
               {uniqueSubjects.map((sub) => (
@@ -304,15 +311,16 @@ export default function AttendanceRecordsTab() {
           <p className="text-[11px] text-[#64748B] mt-1">Recorded classroom roll-calls</p>
         </div>
 
+        {/* Avg Attendance Rate KPI - Uses the exact same colour as the rate badge */}
         <div className="bg-white rounded-2xl border border-[#E2E8F0] p-5 shadow-xs">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-[#64748B]">Avg Attendance Rate</span>
-            <div className="p-2 rounded-xl bg-[#ECFDF5] text-[#047857]">
+            <div className={`p-2 rounded-xl ${avgRateInfo.bgClass} ${avgRateInfo.textClass}`}>
               <TrendingUp className="h-4 w-4" />
             </div>
           </div>
-          <div className="text-2xl font-bold text-[#047857] mt-2">
-            {avgAttendanceRate.toFixed(1)}%
+          <div className={`text-2xl font-bold ${avgRateInfo.textClass} mt-2`}>
+            {avgRateInfo.label}
           </div>
           <p className="text-[11px] text-[#64748B] mt-1">Across all selected sessions</p>
         </div>
@@ -343,9 +351,9 @@ export default function AttendanceRecordsTab() {
           </span>
         </div>
 
-        {chartData.length === 0 ? (
+        {chartData.length < 2 ? (
           <div className="py-12 text-center text-xs text-[#64748B] bg-[#F8FAFC] rounded-xl border border-dashed border-[#E2E8F0]">
-            No attendance data points available for the selected filters.
+            Not enough data yet. Trends appear after 2 or more sessions.
           </div>
         ) : (
           <div className="space-y-2">
@@ -367,7 +375,7 @@ export default function AttendanceRecordsTab() {
                 {/* Path Generation */}
                 {(() => {
                   const pts = chartData.map((d, i) => {
-                    const x = chartData.length > 1 ? (i / (chartData.length - 1)) * 100 : 50;
+                    const x = (i / (chartData.length - 1)) * 100;
                     const r = d.rate ?? 0;
                     const y = 100 - r; // 100% at top (y=0)
                     return { x, y, data: d };
@@ -412,11 +420,17 @@ export default function AttendanceRecordsTab() {
               )}
             </div>
 
-            {/* X-Axis labels */}
-            <div className="flex items-center justify-between text-[10px] text-[#64748B] px-1">
-              <span>{chartData[0]?.Time || "Earliest"}</span>
-              <span>{chartData[chartData.length - 1]?.Time || "Latest"}</span>
-            </div>
+            {/* X-Axis labels: ensure different or single */}
+            {chartData[0]?.Time !== chartData[chartData.length - 1]?.Time ? (
+              <div className="flex items-center justify-between text-[10px] text-[#64748B] px-1">
+                <span>{chartData[0]?.Time || "Earliest"}</span>
+                <span>{chartData[chartData.length - 1]?.Time || "Latest"}</span>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center text-[10px] text-[#64748B] px-1">
+                <span>{chartData[0]?.Time}</span>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -466,7 +480,8 @@ export default function AttendanceRecordsTab() {
               <tbody className="divide-y divide-[#E2E8F0]">
                 {filteredSessions.map((session, idx) => {
                   const rate = session.rate ?? 0;
-                  const status = rate >= 75 ? "success" : rate >= 50 ? "warning" : "danger";
+                  const total = session.total_count ?? 1;
+                  const rateInfo = getAttendanceRateInfo(rate, total);
 
                   return (
                     <tr key={idx} className="hover:bg-[#F8FAFC] transition-colors">
@@ -481,7 +496,7 @@ export default function AttendanceRecordsTab() {
                       </td>
                       <td className="py-3 px-4 text-[#0F172A]">{session.Attendance_Stats}</td>
                       <td className="py-3 px-4 text-right">
-                        <StatusBadge status={status}>{rate.toFixed(1)}%</StatusBadge>
+                        <StatusBadge status={rateInfo.status}>{rateInfo.label}</StatusBadge>
                       </td>
                     </tr>
                   );

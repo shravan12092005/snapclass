@@ -12,8 +12,17 @@ const outfit = Outfit({
 });
 
 export const metadata: Metadata = {
-  title: "SnapClass - Smart AI Classroom Attendance",
-  description: "Biometric face recognition and voice verification attendance system for modern educators and students.",
+  title: {
+    default: "SnapClass",
+    template: "%s | SnapClass",
+  },
+  description: "Face and voice attendance system for modern educators and students.",
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico", sizes: "any" },
+    ],
+  },
 };
 
 export default function RootLayout({

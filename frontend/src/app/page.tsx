@@ -6,7 +6,6 @@ import {
   GraduationCap,
   UserCheck,
   ShieldCheck,
-  Zap,
   Lock,
   ChevronRight,
   Camera,
@@ -50,9 +49,9 @@ export default function HomePage() {
           {/* Floating feature pills */}
           <div className="flex flex-wrap justify-center gap-3 mt-8">
             {[
-              { icon: Scan, label: "128D Face Vectors" },
-              { icon: Eye, label: "Real-Time Matching" },
-              { icon: Lock, label: "Privacy-First Design" },
+              { icon: Scan, label: "Face and voice attendance" },
+              { icon: Eye, label: "Consent-based enrolment" },
+              { icon: Lock, label: "Device lockout after failed attempts" },
             ].map(({ icon: Icon, label }) => (
               <div
                 key={label}
@@ -158,10 +157,10 @@ export default function HomePage() {
             Why SnapClass
           </p>
           <h3 className="text-2xl font-bold text-[#0F172A]">
-            Enterprise-Grade Biometric Security
+            Face and voice attendance
           </h3>
           <p className="text-sm text-[#64748B] mt-2 max-w-lg mx-auto">
-            Built with privacy, accuracy, and anti-spoofing at its core
+            Device lockout after failed attempts and consent-based enrolment
           </p>
         </div>
 
