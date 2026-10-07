@@ -33,6 +33,7 @@ from app.services.db import (
     safe_execute,
 )
 from app.services.face_pipeline import predict_attendance
+from app.services.exceptions import FacePipelineError
 from app.services.voice_pipeline import process_bulk_audio
 from PIL import Image, ImageOps
 
@@ -89,8 +90,11 @@ async def face_attendance_route(
             raise HTTPException(413, f"Image {idx+1} too large (max 10 MB)")
 
         img = ImageOps.exif_transpose(Image.open(io.BytesIO(img_bytes)))
-        img_np = np.array(img.convert("RGB"))
-        detected, _, _ = predict_attendance(img_np, candidate_ids=candidate_ids)
+        img_np = np.ascontiguousarray(np.array(img.convert("RGB"), dtype=np.uint8))
+        try:
+            detected, _, _ = predict_attendance(img_np, candidate_ids=candidate_ids)
+        except FacePipelineError:
+            detected = {}
 
         if detected:
             for sid in detected.keys():

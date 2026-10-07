@@ -263,6 +263,32 @@ SnapClass features an optional speaker verification pipeline:
 
 ---
 
+## 🩺 Troubleshooting
+
+### Face Login returns "Service temporarily unavailable" (503)
+The lockout store (Supabase `login_attempts` table) is unreachable. Check:
+1. `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are set correctly in `backend/.env`.
+2. The `login_attempts` table and the `record_login_attempt` RPC function exist — run the migration in `supabase/migrations/`.
+3. Backend startup logs will print `login_attempts table is reachable: yes/no` to help diagnose.
+
+### Camera shows black frame or keeps restarting
+- Ensure you're accessing the frontend over `localhost`, not `0.0.0.0` — browsers block `getUserMedia` on non-secure origins.
+- The "Capture Face" button stays disabled until the video feed has data. Wait for the live preview to appear.
+- After clicking "Retake Photo", the video feed re-attaches automatically. If it stays black, click "Try Camera Again".
+
+### Cookies not sent / session lost between requests
+- Set `COOKIE_SECURE=false` in `backend/.env` for local HTTP development.
+- Set `DEV_MODE=true` so session and lockout secrets fall back to dev defaults.
+- Make sure `CORS_ORIGINS` includes `http://localhost:3000` (exact match, no trailing slash).
+
+### "Too many failed attempts" lockout during development
+Clear the `login_attempts` table in Supabase to reset all lockouts:
+```sql
+DELETE FROM login_attempts;
+```
+
+---
+
 ## 📄 License
 Distributed under the MIT License. See [LICENSE](LICENSE) for more information.
 

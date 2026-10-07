@@ -30,11 +30,34 @@ async def lifespan(app: FastAPI):
             raise RuntimeError("LOCKOUT_SECRET environment variable is missing. Refusing to start.")
 
     logger.info("Loading ML models at startup…")
-    from app.services.face_pipeline import load_dlib_models
-    from app.services.voice_pipeline import load_voice_encoder
-    load_dlib_models()
-    load_voice_encoder()
+    dlib_loaded = "no"
+    try:
+        from app.services.face_pipeline import load_dlib_models
+        load_dlib_models()
+        dlib_loaded = "yes"
+    except Exception as _e:
+        logger.error("dlib model loading failed: %s", _e)
+        dlib_loaded = "no"
+    logger.info("dlib models loaded: %s", dlib_loaded)
+
+    try:
+        from app.services.voice_pipeline import load_voice_encoder
+        load_voice_encoder()
+    except Exception as _e:
+        logger.error("voice encoder loading failed: %s", _e)
     logger.info("ML models loaded.")
+
+    # Startup diagnostics (never log secret values)
+    srk = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+    logger.info("SUPABASE_SERVICE_ROLE_KEY is %s", "set" if srk else "NOT set")
+
+    try:
+        from app.config import supabase as _sb
+        _sb.table("login_attempts").select("key_hash").limit(1).execute()
+        logger.info("login_attempts table is reachable: yes")
+    except Exception as _e:
+        logger.warning("login_attempts table is reachable: no (%s)", _e)
+
     yield
 
 

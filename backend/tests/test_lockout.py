@@ -292,9 +292,10 @@ class TestLockout(unittest.TestCase):
         self.assertEqual(res["attempts"], 5)
 
         # 2. Checking lockout on unreachable store must fail closed (treat as blocked)
-        is_locked, remaining, _ = check_lockout("dev1", "1.2.3.4", client=failing_db)
+        is_locked, remaining, reason = check_lockout("dev1", "1.2.3.4", client=failing_db)
         self.assertTrue(is_locked)
         self.assertEqual(remaining, 60)
+        self.assertEqual(reason, "store_error")
 
     # -----------------------------------------------------------------------
     # 6. HMAC-SHA256 key hashing

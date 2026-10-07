@@ -20,7 +20,7 @@ from src.database.db import (
     get_subject_attendance_logs,
     unenroll_student_to_subject,
 )
-from src.database.exceptions import DatabaseError
+from src.database.exceptions import DatabaseError, FacePipelineError
 from src.components.dialog_create_subject import create_subject_dialog
 from src.components.dialog_share_subject import share_subject_dialog
 from src.components.dialog_add_photo import add_photos_dialog
@@ -202,7 +202,10 @@ def teacher_tab_take_attendance():
 
                 for idx, img in enumerate(st.session_state.attendance_images):
                     img_np = np.array(img.convert('RGB'))
-                    detected, _, _ = predict_attendance(img_np, candidate_ids=candidate_ids)
+                    try:
+                        detected, _, _ = predict_attendance(img_np, candidate_ids=candidate_ids)
+                    except FacePipelineError:
+                        detected = {}
 
                     if detected:
                         for sid in detected.keys():

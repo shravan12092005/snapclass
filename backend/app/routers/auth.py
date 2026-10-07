@@ -43,6 +43,7 @@ from app.services.db import (
     teacher_login,
 )
 from app.services.face_pipeline import get_face_embeddings, predict_attendance, train_classifier
+from app.services.exceptions import FacePipelineError
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -113,6 +114,11 @@ async def student_face_login_route(
 
     is_locked, remaining_seconds, reason = check_lockout(device_id, client_ip)
     if is_locked:
+        if reason == "store_error":
+            raise HTTPException(
+                status_code=503,
+                detail="Service temporarily unavailable. Please try again.",
+            )
         raise HTTPException(
             status_code=429,
             detail=f"Too many failed login attempts. Locked out for {remaining_seconds} seconds.",
@@ -125,14 +131,27 @@ async def student_face_login_route(
     if len(img_bytes) > MAX_IMAGE_SIZE:
         raise HTTPException(413, "Image too large (max 10 MB)")
 
-    img = ImageOps.exif_transpose(Image.open(io.BytesIO(img_bytes)))
-    img_np = np.array(img.convert("RGB"))
+    try:
+        raw_img = Image.open(io.BytesIO(img_bytes))
+        img = ImageOps.exif_transpose(raw_img)
+        img_np = np.ascontiguousarray(np.array(img.convert("RGB"), dtype=np.uint8))
+    except Exception:
+        raise HTTPException(400, "Invalid image format")
 
-    detected, _, num_faces = predict_attendance(img_np, login_mode=True)
+    try:
+        detected, all_students, num_faces = predict_attendance(img_np, login_mode=True)
+    except FacePipelineError:
+        raise HTTPException(
+            status_code=503,
+            detail="Face recognition service error. Please try again.",
+        )
+
     decision = face_login_decision(detected, num_faces)
 
     if decision[0] == "no_face":
         raise HTTPException(400, "No face detected in the image")
+    elif not all_students:
+        raise HTTPException(401, "No registered students found. Please create a profile first.")
     elif decision[0] == "multi_face":
         raise HTTPException(400, "Multiple faces detected — use a single-person photo")
     elif decision[0] == "not_recognized":
@@ -180,10 +199,18 @@ async def student_register_route(
     if len(img_bytes) > MAX_IMAGE_SIZE:
         raise HTTPException(413, "Image too large (max 10 MB)")
 
-    img = ImageOps.exif_transpose(Image.open(io.BytesIO(img_bytes)))
-    img_np = np.array(img.convert("RGB"))
+    try:
+        raw_img = Image.open(io.BytesIO(img_bytes))
+        img = ImageOps.exif_transpose(raw_img)
+        img_np = np.ascontiguousarray(np.array(img.convert("RGB"), dtype=np.uint8))
+    except Exception:
+        raise HTTPException(400, "Invalid image format")
 
-    encodings = get_face_embeddings(img_np)
+    try:
+        encodings = get_face_embeddings(img_np)
+    except FacePipelineError:
+        raise HTTPException(503, "Face recognition service error. Please try again.")
+
     if not encodings:
         raise HTTPException(400, "Could not capture facial features. Please try again.")
     face_emb = encodings[0].tolist()

@@ -17,7 +17,7 @@ from src.database.db import (
     get_student_dashboard_data,
     unenroll_student_to_subject,
 )
-from src.database.exceptions import DatabaseError
+from src.database.exceptions import DatabaseError, FacePipelineError
 from src.components.dialog_enroll import enroll_dialog
 from src.components.subject_card import subject_card
 from src.services.auth_helpers import face_login_decision, check_duplicate_face
@@ -182,7 +182,11 @@ def student_screen():
         img_np = np.array(img.convert('RGB'))
 
         with st.spinner('AI is scanning..'):
-            detected, all_ids, num_faces = predict_attendance(img_np, login_mode=True)
+            try:
+                detected, all_ids, num_faces = predict_attendance(img_np, login_mode=True)
+            except FacePipelineError:
+                st.error("Face recognition service error. Please try again.")
+                detected, all_ids, num_faces = {}, [], 0
             decision = face_login_decision(detected, num_faces)
 
             if decision[0] == "no_face":
@@ -216,7 +220,10 @@ def student_screen():
                     st.rerun()
                 else:
                     st.warning(f'Face not recognized! (Attempt {st.session_state.face_login_attempts}/5)')
-                    encodings = get_face_embeddings(img_np)
+                    try:
+                        encodings = get_face_embeddings(img_np)
+                    except FacePipelineError:
+                        encodings = []
                     if encodings:
                         st.session_state.temp_face_encoding = encodings[0].tolist()
                     else:

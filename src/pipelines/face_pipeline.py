@@ -8,6 +8,7 @@ from PIL import Image
 
 from src.utils.logger import logger
 from src.database.db import get_all_students
+from src.database.exceptions import FacePipelineError
 
 # ---------------------------------------------------------------------------
 # Configurable thresholds (Task 7)
@@ -65,6 +66,7 @@ def get_face_embeddings(image_np):
         detector, sp, facerec = load_dlib_models()
 
         def _extract_from_img(img_arr):
+            img_arr = np.ascontiguousarray(img_arr)
             faces = detector(img_arr, 1)
             encs = []
             for face in faces:
@@ -103,7 +105,7 @@ def get_face_embeddings(image_np):
         return deduplicate_embeddings(all_encodings, threshold=0.25)
     except Exception as e:
         logger.error(f"Error in face embedding extraction: {str(e)}\n{traceback.format_exc()}")
-        return []
+        raise FacePipelineError(f"Error in face embedding extraction: {str(e)}") from e
 
 
 # ---------------------------------------------------------------------------
@@ -210,6 +212,8 @@ def predict_attendance(class_image_np, *, candidate_ids=None, login_mode=False):
                 detected_student[best_id] = True
 
         return detected_student, all_students, len(encodings)
+    except FacePipelineError:
+        raise
     except Exception as e:
         logger.error(f"Error in predict_attendance: {str(e)}\n{traceback.format_exc()}")
-        return {}, [], 0
+        raise FacePipelineError(f"Error in predict_attendance: {str(e)}") from e

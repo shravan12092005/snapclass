@@ -153,42 +153,44 @@ def _parse_timestamp(val) -> Optional[datetime]:
     return None
 
 
-def is_key_blocked(key_hash: str, client=None) -> Tuple[bool, int]:
+def is_key_blocked(key_hash: str, client=None) -> Tuple[bool, int, str]:
     """Check if a specific key hash is currently locked out.
 
     Returns
     -------
-    tuple[bool, int]
-        ``(is_blocked, remaining_seconds)``
+    tuple[bool, int, str]
+        ``(is_blocked, remaining_seconds, blocked_reason)``
+        where blocked_reason is ``"store_error"`` when the store is unreachable
+        or ``""`` for normal (real-lockout or not-blocked) results.
 
     Fail-closed behavior:
     If the store is unreachable or queries fail, logs an error and returns
-    ``(True, 60)`` to ensure brute-force attempts cannot proceed undetected.
+    ``(True, 60, "store_error")`` to ensure brute-force attempts cannot proceed undetected.
     """
     db = _get_supabase_client(client)
     if not db:
         logger.error("Supabase client is unavailable in lockout check. Failing closed.")
-        return True, 60
+        return True, 60, "store_error"
 
     try:
         res = db.table("login_attempts").select("*").eq("key_hash", key_hash).execute()
         if not res.data:
-            return False, 0
+            return False, 0, ""
 
         row = res.data[0]
         blocked_until = _parse_timestamp(row.get("blocked_until"))
         if not blocked_until:
-            return False, 0
+            return False, 0, ""
 
         now = datetime.now(timezone.utc)
         if blocked_until > now:
             remaining = int((blocked_until - now).total_seconds())
-            return True, max(1, remaining)
+            return True, max(1, remaining), ""
 
-        return False, 0
+        return False, 0, ""
     except Exception as e:
         logger.error("Failed to query login_attempts table (%s). Store is unreachable; failing closed.", e)
-        return True, 60
+        return True, 60, "store_error"
 
 
 def check_lockout(device_id: str, client_ip: str, client=None) -> Tuple[bool, int, str]:
@@ -199,18 +201,25 @@ def check_lockout(device_id: str, client_ip: str, client=None) -> Tuple[bool, in
     Returns
     -------
     tuple[bool, int, str]
-        ``(is_locked, remaining_seconds, reason)`` where reason is "device", "ip", or ""
+        ``(is_locked, remaining_seconds, reason)`` where reason is
+        ``"device"``, ``"ip"``, ``"store_error"``, or ``""``.
+        ``"store_error"`` means the lockout store was unreachable (fail-closed),
+        NOT a real lockout — callers should return 503 instead of 429.
     """
     # 1. Device check
     dev_hash = hash_key("device", device_id)
-    blocked, remaining = is_key_blocked(dev_hash, client=client)
+    blocked, remaining, blocked_reason = is_key_blocked(dev_hash, client=client)
     if blocked:
+        if blocked_reason == "store_error":
+            return True, remaining, "store_error"
         return True, remaining, "device"
 
     # 2. IP backstop check
     ip_hash = hash_key("ip", client_ip)
-    blocked, remaining = is_key_blocked(ip_hash, client=client)
+    blocked, remaining, blocked_reason = is_key_blocked(ip_hash, client=client)
     if blocked:
+        if blocked_reason == "store_error":
+            return True, remaining, "store_error"
         return True, remaining, "ip"
 
     return False, 0, ""

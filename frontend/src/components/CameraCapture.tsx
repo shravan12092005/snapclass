@@ -17,16 +17,20 @@ export default function CameraCapture({
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Keep the MediaStream in a ref so it never triggers re-renders / effect loops
+  const streamRef = useRef<MediaStream | null>(null);
 
-  const [stream, setStream] = useState<MediaStream | null>(null);
   const [capturedUrl, setCapturedUrl] = useState<string | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [videoReady, setVideoReady] = useState(false);
   const [useUploadFallback, setUseUploadFallback] = useState(false);
 
+  // ── Start camera ──────────────────────────────────────────────────────
   const startCamera = useCallback(async () => {
     setIsInitializing(true);
     setCameraError(null);
+    setVideoReady(false);
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         throw new Error("Camera API is not supported in this browser environment.");
@@ -41,7 +45,8 @@ export default function CameraCapture({
         audio: false,
       });
 
-      setStream(mediaStream);
+      streamRef.current = mediaStream;
+      // Attach to <video> if it's already mounted
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
       }
@@ -60,13 +65,16 @@ export default function CameraCapture({
     }
   }, []);
 
+  // ── Stop camera ───────────────────────────────────────────────────────
   const stopCamera = useCallback(() => {
-    if (stream) {
-      stream.getTracks().forEach((track) => track.stop());
-      setStream(null);
+    const s = streamRef.current;
+    if (s) {
+      s.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
     }
-  }, [stream]);
+  }, []);
 
+  // ── Mount / unmount: start once, stop on cleanup ──────────────────────
   useEffect(() => {
     if (!useUploadFallback) {
       startCamera();
@@ -74,10 +82,21 @@ export default function CameraCapture({
     return () => {
       stopCamera();
     };
-  }, [startCamera, stopCamera, useUploadFallback]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [useUploadFallback]);
 
+  // ── Re-attach stream whenever the <video> element mounts ─────────────
+  // (handles the Retake flow where React unmounts the <img> and mounts <video>)
+  const attachStream = useCallback((el: HTMLVideoElement | null) => {
+    videoRef.current = el;
+    if (el && streamRef.current) {
+      el.srcObject = streamRef.current;
+    }
+  }, []);
+
+  // ── Capture ───────────────────────────────────────────────────────────
   const handleCapture = () => {
-    if (!videoRef.current || !canvasRef.current) return;
+    if (!videoRef.current || !canvasRef.current || !videoReady) return;
     const video = videoRef.current;
     const canvas = canvasRef.current;
 
@@ -103,16 +122,20 @@ export default function CameraCapture({
     );
   };
 
+  // ── Retake ────────────────────────────────────────────────────────────
   const handleRetake = () => {
     if (capturedUrl) {
       URL.revokeObjectURL(capturedUrl);
     }
     setCapturedUrl(null);
-    if (!useUploadFallback && !stream) {
+    setVideoReady(false);
+    // If the stream was stopped (e.g. after navigating away), restart it
+    if (!useUploadFallback && !streamRef.current) {
       startCamera();
     }
   };
 
+  // ── File upload fallback ──────────────────────────────────────────────
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -128,10 +151,12 @@ export default function CameraCapture({
       <canvas ref={canvasRef} className="hidden" />
 
       {/* Header Info */}
-      <div className="text-center mb-4">
-        <h3 className="text-lg font-bold text-[#0F172A]">{title}</h3>
-        <p className="text-xs text-[#64748B] mt-1 max-w-sm">{subtitle}</p>
-      </div>
+      {(title || subtitle) && (
+        <div className="text-center mb-4">
+          {title && <h3 className="text-lg font-bold text-[#0F172A]">{title}</h3>}
+          {subtitle && <p className="text-xs text-[#64748B] mt-1 max-w-sm">{subtitle}</p>}
+        </div>
+      )}
 
       {/* Video Viewport with Oval Framing Guide */}
       <div className="relative w-full max-w-md aspect-4/3 rounded-2xl overflow-hidden bg-slate-900 border-2 border-[#E2E8F0] shadow-md flex items-center justify-center">
@@ -147,10 +172,11 @@ export default function CameraCapture({
         ) : !useUploadFallback && !cameraError ? (
           <>
             <video
-              ref={videoRef}
+              ref={attachStream}
               autoPlay
               playsInline
               muted
+              onLoadedData={() => setVideoReady(true)}
               className="w-full h-full object-cover transform -scale-x-100"
             />
 
@@ -236,7 +262,7 @@ export default function CameraCapture({
             <button
               type="button"
               onClick={handleCapture}
-              disabled={isInitializing}
+              disabled={isInitializing || !videoReady}
               className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-bold rounded-xl bg-[#4F46E5] text-white hover:bg-[#4338CA] shadow-sm disabled:opacity-50 transition-all hover:scale-[1.02]"
             >
               <Camera className="h-4 w-4" />

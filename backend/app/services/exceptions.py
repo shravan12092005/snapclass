@@ -7,3 +7,7 @@ class DatabaseError(Exception):
     Callers in the UI layer should catch this and display the error
     via ``st.error`` — the DB layer itself never calls ``st.error``.
     """
+
+
+class FacePipelineError(Exception):
+    """Raised when face detection or embedding extraction fails unexpectedly."""

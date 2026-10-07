@@ -124,3 +124,11 @@ venv.bak/
 node_modules/
 .next/
 out/
+
+# Secrets & sensitive files
+.streamlit/secrets.toml
+backend/.env
+frontend/.env.local
+*.log
+backend/snapclass.log
+snapclass.log
