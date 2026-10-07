@@ -18,6 +18,7 @@ from app.services.db import (
 router = APIRouter(prefix="/api/enrollment", tags=["enrollment"])
 
 
+@router.post("", response_model=MessageResponse)
 @router.post("/", response_model=MessageResponse)
 def enroll_route(req: EnrollRequest, request: Request):
     student_id = require_student(request)

@@ -48,6 +48,7 @@ def _generate_unique_code(max_retries=10):
     return _generate_subject_code(length=8)
 
 
+@router.get("", response_model=SubjectListResponse)
 @router.get("/", response_model=SubjectListResponse)
 def list_subjects(request: Request):
     teacher_id = require_teacher(request)
@@ -68,6 +69,7 @@ def list_subjects(request: Request):
     )
 
 
+@router.post("", response_model=SubjectResponse)
 @router.post("/", response_model=SubjectResponse)
 def create_subject_route(req: CreateSubjectRequest, request: Request):
     teacher_id = require_teacher(request)
