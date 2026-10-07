@@ -150,8 +150,58 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* 3-Step "How it works" Section */}
+      <section className="w-full max-w-4xl mx-auto mt-16 pt-10 border-t border-[#E2E8F0]">
+        <div className="text-center mb-10">
+          <p className="text-xs uppercase tracking-widest font-bold text-[#4F46E5] mb-2">
+            Simple 3-Step Workflow
+          </p>
+          <h2 className="text-2xl sm:text-3xl font-bold text-[#0F172A]">
+            How It Works
+          </h2>
+          <p className="text-sm text-[#64748B] mt-2 max-w-lg mx-auto">
+            From setup to verified attendance records in three streamlined steps.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative">
+          {/* Step 1 */}
+          <div className="relative bg-white rounded-2xl border border-[#E2E8F0] p-6 shadow-xs hover:border-[#C7D2FE] transition-colors">
+            <div className="h-10 w-10 rounded-xl bg-[#EEF2FF] border border-[#C7D2FE] flex items-center justify-center text-[#4F46E5] font-black text-sm mb-4">
+              01
+            </div>
+            <h3 className="text-base font-bold text-[#0F172A]">Create course</h3>
+            <p className="text-xs text-[#64748B] mt-2 leading-relaxed">
+              Instructors set up courses and share the 6-character course code. Students join instantly with their biometric profile.
+            </p>
+          </div>
+
+          {/* Step 2 */}
+          <div className="relative bg-white rounded-2xl border border-[#E2E8F0] p-6 shadow-xs hover:border-[#C7D2FE] transition-colors">
+            <div className="h-10 w-10 rounded-xl bg-[#EEF2FF] border border-[#C7D2FE] flex items-center justify-center text-[#4F46E5] font-black text-sm mb-4">
+              02
+            </div>
+            <h3 className="text-base font-bold text-[#0F172A]">Take attendance</h3>
+            <p className="text-xs text-[#64748B] mt-2 leading-relaxed">
+              Capture classroom photos or record roll-call audio. The AI biometric pipeline matches enrolled students in seconds.
+            </p>
+          </div>
+
+          {/* Step 3 */}
+          <div className="relative bg-white rounded-2xl border border-[#E2E8F0] p-6 shadow-xs hover:border-[#C7D2FE] transition-colors">
+            <div className="h-10 w-10 rounded-xl bg-[#EEF2FF] border border-[#C7D2FE] flex items-center justify-center text-[#4F46E5] font-black text-sm mb-4">
+              03
+            </div>
+            <h3 className="text-base font-bold text-[#0F172A]">Review records</h3>
+            <p className="text-xs text-[#64748B] mt-2 leading-relaxed">
+              Inspect present and absent student rosters, monitor percentage trends across sessions, and export clean CSV reports.
+            </p>
+          </div>
+        </div>
+      </section>
+
       {/* Feature / Security Highlights */}
-      <section className="w-full py-16 mt-8 max-w-5xl mx-auto">
+      <section className="w-full py-16 mt-4 max-w-5xl mx-auto">
         <div className="text-center mb-10">
           <p className="text-xs uppercase tracking-widest font-bold text-[#4F46E5] mb-2">
             Why SnapClass

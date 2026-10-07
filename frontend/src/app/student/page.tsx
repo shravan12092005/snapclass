@@ -26,6 +26,7 @@ import { getAttendanceRateInfo } from "@/lib/rateColor";
 import EnrollModal from "@/components/student/EnrollModal";
 import UnenrollModal from "@/components/student/UnenrollModal";
 import DeleteProfileModal from "@/components/student/DeleteProfileModal";
+import { DashboardSkeleton } from "@/components/Skeleton";
 
 function StudentDashboardContent() {
   const router = useRouter();
@@ -93,13 +94,8 @@ function StudentDashboardContent() {
   const totalAttended = useMemo(() => subjects.reduce((acc, s) => acc + s.attended, 0), [subjects]);
   const overallRate = totalClasses > 0 ? (totalAttended / totalClasses) * 100 : 0;
 
-  if (isLoading || !isStudent) {
-    return (
-      <div className="min-h-[50vh] flex flex-col items-center justify-center">
-        <Loader2 className="h-8 w-8 text-[#4F46E5] animate-spin mb-2" />
-        <p className="text-xs text-[#64748B]">Verifying student session…</p>
-      </div>
-    );
+  if (isLoading || !isStudent || isLoadingDashboard) {
+    return <DashboardSkeleton />;
   }
 
   const student = currentUser.user as any;
@@ -410,14 +406,7 @@ function StudentDashboardContent() {
 
 export default function StudentDashboard() {
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-[50vh] flex flex-col items-center justify-center">
-          <Loader2 className="h-8 w-8 text-[#4F46E5] animate-spin mb-2" />
-          <p className="text-xs text-[#64748B]">Loading student dashboard…</p>
-        </div>
-      }
-    >
+    <Suspense fallback={<DashboardSkeleton />}>
       <StudentDashboardContent />
     </Suspense>
   );

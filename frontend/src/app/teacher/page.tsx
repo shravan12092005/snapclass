@@ -11,6 +11,7 @@ import TakeAttendanceTab from "@/components/teacher/TakeAttendanceTab";
 import ManageSubjectsTab from "@/components/teacher/ManageSubjectsTab";
 import AttendanceRecordsTab from "@/components/teacher/AttendanceRecordsTab";
 import CreateSubjectModal from "@/components/teacher/CreateSubjectModal";
+import { DashboardSkeleton } from "@/components/Skeleton";
 
 export default function TeacherDashboard() {
   const router = useRouter();
@@ -48,13 +49,8 @@ export default function TeacherDashboard() {
     }
   }, [currentUser, fetchSubjects]);
 
-  if (isLoading || !isTeacher) {
-    return (
-      <div className="min-h-[50vh] flex flex-col items-center justify-center">
-        <Loader2 className="h-8 w-8 text-[#4F46E5] animate-spin mb-2" />
-        <p className="text-xs text-[#64748B]">Verifying faculty credentials…</p>
-      </div>
-    );
+  if (isLoading || !isTeacher || isLoadingSubjects) {
+    return <DashboardSkeleton />;
   }
 
   const teacher = currentUser.user as any;

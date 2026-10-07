@@ -12,13 +12,13 @@ import {
   TrendingUp,
   Users,
   Clock,
-  Loader2,
   AlertCircle,
   RefreshCw,
   ChevronDown,
 } from "lucide-react";
 import StatusBadge from "@/components/StatusBadge";
 import { getAttendanceRateInfo } from "@/lib/rateColor";
+import { TableSkeleton } from "@/components/Skeleton";
 
 export default function AttendanceRecordsTab() {
   const [sessions, setSessions] = useState<AttendanceSessionSummary[]>([]);
@@ -459,9 +459,8 @@ export default function AttendanceRecordsTab() {
         </div>
 
         {isLoading ? (
-          <div className="py-16 flex flex-col items-center justify-center text-[#64748B]">
-            <Loader2 className="h-6 w-6 text-[#4F46E5] animate-spin mb-2" />
-            <p className="text-xs">Loading attendance records…</p>
+          <div className="p-4">
+            <TableSkeleton rows={5} />
           </div>
         ) : filteredSessions.length === 0 ? (
           <div className="py-16 text-center text-xs text-[#64748B]">

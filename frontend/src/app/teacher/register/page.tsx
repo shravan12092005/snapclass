@@ -3,6 +3,6 @@
 import React from "react";
 import TeacherAuthForm from "@/components/teacher/TeacherAuthForm";
 
-export default function TeacherLoginPage() {
-  return <TeacherAuthForm initialMode="login" />;
+export default function TeacherRegisterPage() {
+  return <TeacherAuthForm initialMode="register" />;
 }

@@ -5,9 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import {
   LogOut,
-  User,
   Sparkles,
-  GraduationCap,
   ShieldCheck,
   Menu,
   X,
@@ -39,22 +37,9 @@ export default function Navbar() {
           {/* Desktop Navigation */}
           <nav className="hidden sm:flex items-center gap-4">
             {!currentUser.authenticated ? (
-              <div className="flex items-center gap-3">
-                <Link
-                  href="/teacher/login"
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium rounded-lg text-[#0F172A] hover:bg-[#F8FAFC] hover:text-[#4F46E5] transition-colors"
-                >
-                  <GraduationCap className="h-4 w-4 text-[#4F46E5]" />
-                  <span>Teacher Portal</span>
-                </Link>
-                <Link
-                  href="/student/login"
-                  className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-xl bg-[#4F46E5] text-white hover:bg-[#4338CA] shadow-sm transition-all hover:shadow-md"
-                >
-                  <User className="h-4 w-4" />
-                  <span>Student Sign-In</span>
-                </Link>
-              </div>
+              <span className="text-xs font-medium text-[#64748B]">
+                AI Biometric Attendance System
+              </span>
             ) : (
               <div className="flex items-center gap-3">
                 {isTeacher && (
@@ -100,71 +85,50 @@ export default function Navbar() {
             )}
           </nav>
 
-          {/* Mobile menu button */}
-          <button
-            type="button"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="sm:hidden p-2 rounded-lg text-[#64748B] hover:bg-[#F8FAFC] transition-colors"
-            aria-label="Toggle navigation menu"
-          >
-            {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </button>
+          {/* Mobile menu button (only when authenticated) */}
+          {currentUser.authenticated && (
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="sm:hidden p-2 rounded-lg text-[#64748B] hover:bg-[#F8FAFC] transition-colors"
+              aria-label="Toggle navigation menu"
+            >
+              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
+          )}
         </div>
 
         {/* Mobile Navigation */}
-        {mobileMenuOpen && (
+        {mobileMenuOpen && currentUser.authenticated && (
           <div className="sm:hidden pb-4 pt-2 border-t border-[#E2E8F0] space-y-2">
-            {!currentUser.authenticated ? (
-              <>
-                <Link
-                  href="/teacher/login"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium text-[#0F172A] hover:bg-[#F8FAFC]"
-                >
-                  <GraduationCap className="h-4 w-4 text-[#4F46E5]" />
-                  <span>Teacher Portal</span>
-                </Link>
-                <Link
-                  href="/student/login"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold bg-[#4F46E5] text-white"
-                >
-                  <User className="h-4 w-4" />
-                  <span>Student Sign-In</span>
-                </Link>
-              </>
-            ) : (
-              <>
-                {isTeacher && (
-                  <Link
-                    href="/teacher"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium text-[#0F172A] hover:bg-[#F8FAFC]"
-                  >
-                    Dashboard
-                  </Link>
-                )}
-                {isStudent && (
-                  <Link
-                    href="/student"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium text-[#0F172A] hover:bg-[#F8FAFC]"
-                  >
-                    My Attendance
-                  </Link>
-                )}
-                <button
-                  onClick={() => {
-                    logout();
-                    setMobileMenuOpen(false);
-                  }}
-                  className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium text-[#B91C1C] hover:bg-[#FEF2F2]"
-                >
-                  <LogOut className="h-4 w-4" />
-                  <span>Logout</span>
-                </button>
-              </>
+            {isTeacher && (
+              <Link
+                href="/teacher"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium text-[#0F172A] hover:bg-[#F8FAFC]"
+              >
+                Dashboard
+              </Link>
             )}
+            {isStudent && (
+              <Link
+                href="/student"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium text-[#0F172A] hover:bg-[#F8FAFC]"
+              >
+                My Attendance
+              </Link>
+            )}
+            <button
+              onClick={() => {
+                logout();
+                setMobileMenuOpen(false);
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium text-[#B91C1C] hover:bg-[#FEF2F2]"
+            >
+              <LogOut className="h-4 w-4" />
+              <span>Logout</span>
+            </button>
           </div>
         )}
       </div>
