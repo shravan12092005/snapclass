@@ -74,6 +74,7 @@ app.include_router(attendance.router)
 app.include_router(student.router)
 
 
+@app.get("/health")
 @app.get("/api/health")
 def health_check():
     return {"status": "ok"}
