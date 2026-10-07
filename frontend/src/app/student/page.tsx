@@ -18,8 +18,11 @@ import {
   LogOut,
   ChevronDown,
   ChevronUp,
+  Copy,
+  Check,
 } from "lucide-react";
 import StatusBadge from "@/components/StatusBadge";
+import { getAttendanceRateInfo } from "@/lib/rateColor";
 import EnrollModal from "@/components/student/EnrollModal";
 import UnenrollModal from "@/components/student/UnenrollModal";
 import DeleteProfileModal from "@/components/student/DeleteProfileModal";
@@ -38,6 +41,15 @@ function StudentDashboardContent() {
   const [unenrollSubject, setUnenrollSubject] = useState<StudentDashboardSubject | null>(null);
   const [deleteProfileOpen, setDeleteProfileOpen] = useState(false);
   const [dangerZoneOpen, setDangerZoneOpen] = useState(false);
+  const [copiedCodeId, setCopiedCodeId] = useState<number | null>(null);
+
+  const handleCopyCode = async (code: string, id: number) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopiedCodeId(id);
+      setTimeout(() => setCopiedCodeId(null), 2000);
+    } catch {}
+  };
 
   // Authentication guard
   useEffect(() => {
@@ -153,18 +165,24 @@ function StudentDashboardContent() {
           <p className="text-[11px] text-[#64748B] mt-1">Total verified roll-calls</p>
         </div>
 
-        <div className="bg-white rounded-2xl border border-[#E2E8F0] p-5 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-[#64748B]">Overall Attendance</span>
-            <div className="p-2 rounded-xl bg-[#EEF2FF] text-[#4F46E5]">
-              <TrendingUp className="h-4 w-4" />
+        {/* Overall Attendance KPI */}
+        {(() => {
+          const overallRateInfo = getAttendanceRateInfo(overallRate, totalClasses);
+          return (
+            <div className="bg-white rounded-2xl border border-[#E2E8F0] p-5 shadow-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-[#64748B]">Overall Attendance</span>
+                <div className={`p-2 rounded-xl ${overallRateInfo.bgClass} ${overallRateInfo.textClass}`}>
+                  <TrendingUp className="h-4 w-4" />
+                </div>
+              </div>
+              <div className={`text-2xl font-bold ${overallRateInfo.textClass} mt-2`}>
+                {overallRateInfo.label}
+              </div>
+              <p className="text-[11px] text-[#64748B] mt-1">Cumulative attendance rate</p>
             </div>
-          </div>
-          <div className="text-2xl font-bold text-[#0F172A] mt-2">
-            {overallRate.toFixed(1)}%
-          </div>
-          <p className="text-[11px] text-[#64748B] mt-1">Cumulative attendance rate</p>
-        </div>
+          );
+        })()}
       </div>
 
       {/* Enrolled Courses Section */}
@@ -194,7 +212,7 @@ function StudentDashboardContent() {
                 setInitialEnrollCode("");
                 setEnrollModalOpen(true);
               }}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#4F46E5] text-white text-xs font-semibold hover:bg-[#4338CA] shadow-2xs transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#4F46E5] text-white text-xs font-semibold hover:bg-[#4338CA] shadow-2xs transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]"
             >
               <Plus className="h-4 w-4" />
               <span>Enroll with Course Code</span>
@@ -203,9 +221,15 @@ function StudentDashboardContent() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {subjects.map((sub) => {
-              const status = sub.rate >= 75 ? "success" : sub.rate >= 50 ? "warning" : "danger";
+              const rateInfo = getAttendanceRateInfo(sub.rate, sub.total);
               const progressColor =
-                sub.rate >= 75 ? "bg-[#047857]" : sub.rate >= 50 ? "bg-[#B45309]" : "bg-[#B91C1C]";
+                rateInfo.status === "success"
+                  ? "bg-[#047857]"
+                  : rateInfo.status === "warning"
+                  ? "bg-[#B45309]"
+                  : rateInfo.status === "danger"
+                  ? "bg-[#B91C1C]"
+                  : "bg-[#94A3B8]";
 
               return (
                 <div
@@ -213,7 +237,7 @@ function StudentDashboardContent() {
                   className="bg-white rounded-2xl border border-[#E2E8F0] hover:border-[#CBD5E1] p-5 shadow-xs transition-all flex flex-col justify-between gap-4"
                 >
                   <div>
-                    {/* Header */}
+                    {/* Header: Exact course name without title-case enforcement */}
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <h3 className="text-base font-bold text-[#0F172A] leading-snug">{sub.name}</h3>
@@ -224,12 +248,30 @@ function StudentDashboardContent() {
                         )}
                       </div>
 
-                      <span className="px-2.5 py-1 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] text-[11px] font-mono font-bold text-[#0F172A]">
-                        {sub.subject_code}
-                      </span>
+                      {/* Course Code Monospace with Slashed-Zero & Copy Button */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="px-2.5 py-1 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] text-xs font-mono font-bold tracking-wider text-[#0F172A]">
+                          {sub.subject_code}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyCode(sub.subject_code, sub.subject_id)}
+                          className="p-1.5 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] hover:bg-[#EEF2FF] text-[#64748B] hover:text-[#4F46E5] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]"
+                          title="Copy course code"
+                        >
+                          {copiedCodeId === sub.subject_id ? (
+                            <span className="flex items-center gap-1 text-[10px] font-bold text-[#047857] px-0.5">
+                              <Check className="h-3 w-3" />
+                              <span>Copied</span>
+                            </span>
+                          ) : (
+                            <Copy className="h-3.5 w-3.5" />
+                          )}
+                        </button>
+                      </div>
                     </div>
 
-                    {/* Stats */}
+                    {/* Stats Grid */}
                     <div className="mt-4 grid grid-cols-3 gap-2 text-center">
                       <div className="p-2 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0]">
                         <div className="flex items-center justify-center gap-1 text-[10px] text-[#64748B]">
@@ -253,16 +295,21 @@ function StudentDashboardContent() {
                           <span>Rate</span>
                         </div>
                         <div className="mt-0.5">
-                          <StatusBadge status={status}>{sub.rate.toFixed(1)}%</StatusBadge>
+                          <StatusBadge status={rateInfo.status}>{rateInfo.label}</StatusBadge>
                         </div>
                       </div>
                     </div>
 
-                    {/* Progress Bar */}
+                    {/* Progress Bar with "X of Y classes" next to percentage */}
                     <div className="mt-4 space-y-1">
                       <div className="flex items-center justify-between text-[11px] font-semibold text-[#64748B]">
                         <span>Attendance Progress</span>
-                        <span>{sub.rate.toFixed(1)}%</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className={`font-bold ${rateInfo.textClass}`}>{rateInfo.label}</span>
+                          <span>
+                            ({sub.attended} of {sub.total} {sub.total === 1 ? "class" : "classes"})
+                          </span>
+                        </div>
                       </div>
                       <div className="w-full bg-[#E2E8F0] rounded-full h-2 overflow-hidden">
                         <div
@@ -271,6 +318,16 @@ function StudentDashboardContent() {
                         />
                       </div>
                     </div>
+
+                    {/* Low Attendance Warning: ONLY when total >= 3 and rate < 75% */}
+                    {sub.total >= 3 && sub.rate < 75 && (
+                      <div className="mt-3 p-2.5 rounded-xl bg-[#FFFBEB] border border-[#FDE68A] flex items-center gap-2 text-xs text-[#B45309]">
+                        <AlertTriangle className="h-4 w-4 shrink-0" />
+                        <span>
+                          Low attendance warning: {sub.attended} of {sub.total} classes ({sub.rate.toFixed(1)}%). Rate is below 75%.
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Actions */}
@@ -278,7 +335,7 @@ function StudentDashboardContent() {
                     <button
                       type="button"
                       onClick={() => setUnenrollSubject(sub)}
-                      className="text-xs font-semibold text-[#64748B] hover:text-[#B91C1C] flex items-center gap-1.5 transition-colors p-1"
+                      className="text-xs font-semibold text-[#64748B] hover:text-[#B91C1C] flex items-center gap-1.5 transition-colors p-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]"
                     >
                       <LogOut className="h-3.5 w-3.5" />
                       <span>Unenroll from this course</span>

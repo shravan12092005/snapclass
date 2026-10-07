@@ -8,7 +8,6 @@ import CameraCapture from "@/components/CameraCapture";
 import VoiceRecorder from "@/components/VoiceRecorder";
 import {
   UserPlus,
-  ShieldCheck,
   AlertCircle,
   Loader2,
   CheckCircle2,
@@ -143,21 +142,22 @@ export default function StudentRegisterPage() {
           </div>
 
           {/* 4. Mandatory Biometric Consent */}
-          <div className="p-4 rounded-xl bg-slate-50 border border-[#E2E8F0]">
-            <label className="flex items-start gap-3 cursor-pointer">
+          <div className="p-4 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0]">
+            <label htmlFor="student-consent" className="flex items-start gap-3 cursor-pointer select-none">
               <input
+                id="student-consent"
                 type="checkbox"
                 required
                 checked={consent}
                 onChange={(e) => setConsent(e.target.checked)}
-                className="mt-1 h-4 w-4 rounded-sm border-gray-300 text-[#4F46E5] focus:ring-[#4F46E5]"
+                className="mt-1 h-4 w-4 rounded border-[#CBD5E1] text-[#4F46E5] focus:ring-2 focus:ring-[#4F46E5] focus:ring-offset-1 cursor-pointer shrink-0"
               />
-              <div className="text-xs text-[#0F172A]">
-                <span className="font-semibold">Biometric Privacy & Consent</span>
-                <p className="text-[#64748B] mt-0.5 leading-relaxed">
-                  I consent to the capture and storage of mathematical biometric embeddings
-                  (face and voice) strictly for verified academic classroom attendance verification.
-                  I understand raw media is securely discarded after vector extraction.
+              <div className="text-xs text-[#0F172A] leading-relaxed">
+                <span className="font-bold text-[#0F172A] block mb-0.5">Biometric Privacy & Consent</span>
+                <p className="text-[#64748B]">
+                  I consent to the capture and processing of my facial and optional voice embeddings
+                  strictly for verified academic attendance. Biometric data is stored as numeric embeddings,
+                  never as photos.
                 </p>
               </div>
             </label>

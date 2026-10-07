@@ -182,32 +182,27 @@ export default function CameraCapture({
 
             {/* SVG Oval Framing Guide Overlay */}
             <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-              <svg className="w-full h-full" viewBox="0 0 400 300" preserveAspectRatio="none">
+              <svg className="w-full h-full" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid meet">
                 <defs>
                   <mask id="oval-mask">
                     <rect width="400" height="300" fill="white" />
-                    <ellipse cx="200" cy="140" rx="95" ry="120" fill="black" />
+                    <ellipse cx="200" cy="150" rx="85" ry="115" fill="black" />
                   </mask>
                 </defs>
                 {/* Darkened outer mask */}
-                <rect width="400" height="300" fill="rgba(15, 23, 42, 0.45)" mask="url(#oval-mask)" />
+                <rect width="400" height="300" fill="rgba(15, 23, 42, 0.40)" mask="url(#oval-mask)" />
                 {/* Oval guide border with subtle glow */}
                 <ellipse
                   cx="200"
-                  cy="140"
-                  rx="95"
-                  ry="120"
+                  cy="150"
+                  rx="85"
+                  ry="115"
                   fill="none"
                   stroke="#4F46E5"
-                  strokeWidth="3"
+                  strokeWidth="2.5"
                   strokeDasharray="6 4"
-                  className="animate-pulse"
                 />
               </svg>
-
-              <div className="absolute bottom-4 bg-black/60 backdrop-blur-xs text-white text-[11px] font-medium px-3 py-1 rounded-full tracking-wide">
-                Align face inside oval
-              </div>
             </div>
           </>
         ) : (
@@ -235,6 +230,15 @@ export default function CameraCapture({
           </div>
         )}
       </div>
+
+      {/* Alignment Guide Instruction - Positioned below video, never covering face/body */}
+      {!capturedUrl && !useUploadFallback && !cameraError && (
+        <div className="mt-2.5 text-center">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#EEF2FF] border border-[#C7D2FE] text-xs font-semibold text-[#4F46E5]">
+            Align face inside oval
+          </span>
+        </div>
+      )}
 
       {/* Camera Error Alert */}
       {cameraError && !capturedUrl && (
