@@ -96,7 +96,11 @@ export default function StudentRegisterPage() {
         return;
       }
       if (err instanceof ApiError) {
-        setError(err.message);
+        if (err.status >= 500) {
+          setError("The attendance server is temporarily unavailable. Please try again in a moment.");
+        } else {
+          setError(err.message);
+        }
       } else {
         setError("Failed to register student profile. Please try again.");
       }

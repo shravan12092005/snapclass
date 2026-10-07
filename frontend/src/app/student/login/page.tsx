@@ -117,7 +117,7 @@ export default function StudentFaceLoginPage() {
         return;
       }
       if (err instanceof ApiError) {
-        if (err.status === 503) {
+        if (err.status >= 500) {
           setIsServiceDown(true);
           setError("The attendance server is temporarily unavailable. Please try again in a moment.");
         } else if (err.status === 429) {
