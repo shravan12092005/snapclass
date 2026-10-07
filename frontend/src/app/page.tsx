@@ -19,7 +19,7 @@ export default function HomePage() {
   return (
     <div className="flex flex-col items-center">
       {/* Hero Section */}
-      <section className="w-full text-center py-16 sm:py-24 max-w-4xl mx-auto relative">
+      <section className="w-full text-center py-12 sm:py-24 max-w-4xl mx-auto relative overflow-hidden px-4">
         {/* Decorative gradient blobs */}
         <div className="absolute -top-20 -left-32 w-72 h-72 bg-indigo-200 rounded-full opacity-20 blur-3xl pointer-events-none" />
         <div className="absolute -bottom-20 -right-32 w-72 h-72 bg-emerald-200 rounded-full opacity-20 blur-3xl pointer-events-none" />
@@ -32,7 +32,7 @@ export default function HomePage() {
             </span>
           </div>
 
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-[#0F172A] leading-[1.12]">
+          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-[#0F172A] leading-[1.15] px-2">
             Effortless Attendance{" "}
             <br className="hidden sm:inline" />
             Powered by{" "}
