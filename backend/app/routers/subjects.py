@@ -27,6 +27,7 @@ from app.services.roster import compute_roster_data
 from app.config import supabase
 
 import random
+import re
 import string
 
 router = APIRouter(prefix="/api/subjects", tags=["subjects"])
@@ -76,8 +77,21 @@ def create_subject_route(req: CreateSubjectRequest, request: Request):
     if not req.name.strip() or not req.section.strip():
         raise HTTPException(400, "Please fill all the fields")
 
-    sub_code = _generate_unique_code()
-    result = create_subject(sub_code, req.name, req.section, teacher_id)
+    if not req.subject_code or not req.subject_code.strip():
+        raise HTTPException(400, "Course code is required")
+
+    sub_code = req.subject_code.strip().upper()
+    if len(sub_code) < 2 or len(sub_code) > 16:
+        raise HTTPException(400, "Course code must be between 2 and 16 characters")
+
+    if not re.match(r"^[A-Z0-9_\-]+$", sub_code):
+        raise HTTPException(400, "Course code must contain only letters, numbers, hyphens, or underscores")
+
+    existing = lookup_subject_by_code(sub_code)
+    if existing is not None:
+        raise HTTPException(409, f"Course code '{sub_code}' is already taken. Please enter a unique course code.")
+
+    result = create_subject(sub_code, req.name.strip(), req.section.strip(), teacher_id)
     if not result:
         raise HTTPException(500, "Failed to create subject")
 

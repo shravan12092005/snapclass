@@ -6,6 +6,7 @@ from pydantic import BaseModel
 class CreateSubjectRequest(BaseModel):
     name: str
     section: str
+    subject_code: str | None = None
 
 
 class SubjectResponse(BaseModel):

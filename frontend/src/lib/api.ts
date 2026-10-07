@@ -215,11 +215,11 @@ export const api = {
     return res.subjects || [];
   },
 
-  async createSubject(name: string, section: string): Promise<Subject> {
+  async createSubject(name: string, section: string, subjectCode?: string): Promise<Subject> {
     return fetchJson<Subject>("/api/subjects/", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, section }),
+      body: JSON.stringify({ name, section, subject_code: subjectCode }),
     });
   },
 

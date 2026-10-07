@@ -17,6 +17,7 @@ export default function CreateSubjectModal({
 }: CreateSubjectModalProps) {
   const [name, setName] = useState("");
   const [section, setSection] = useState("");
+  const [subjectCode, setSubjectCode] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -24,8 +25,8 @@ export default function CreateSubjectModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !section.trim()) {
-      setErrorMsg("Please fill in both the Course Name and Section.");
+    if (!name.trim() || !section.trim() || !subjectCode.trim()) {
+      setErrorMsg("Please fill in Course Name, Section, and Course Code.");
       return;
     }
 
@@ -33,9 +34,10 @@ export default function CreateSubjectModal({
     setErrorMsg("");
 
     try {
-      await api.createSubject(name.trim(), section.trim());
+      await api.createSubject(name.trim(), section.trim(), subjectCode.trim().toUpperCase());
       setName("");
       setSection("");
+      setSubjectCode("");
       onSubjectCreated();
       onClose();
     } catch (err: any) {
@@ -43,6 +45,8 @@ export default function CreateSubjectModal({
         setErrorMsg(
           "Teacher session required. Your active login in this browser is currently a student account (e.g. from logging into the student portal in another tab). Please sign in as a faculty member again."
         );
+      } else if (err.status === 409) {
+        setErrorMsg(`Course code '${subjectCode.trim().toUpperCase()}' is already in use. Please enter a different code.`);
       } else {
         setErrorMsg(err.message || "Failed to create subject. Please try again.");
       }
@@ -61,7 +65,7 @@ export default function CreateSubjectModal({
             </div>
             <div>
               <h2 className="text-base font-bold text-[#0F172A]">Create New Course</h2>
-              <p className="text-xs text-[#64748B]">Enrollment code will be automatically generated</p>
+              <p className="text-xs text-[#64748B]">Set your course details and enrollment code</p>
             </div>
           </div>
           <button
@@ -109,6 +113,28 @@ export default function CreateSubjectModal({
             />
           </div>
 
+          <div className="space-y-1">
+            <div className="flex items-center justify-between">
+              <label htmlFor="course-code-input" className="text-xs font-semibold text-[#0F172A]">
+                Course Code <span className="text-red-500">*</span>
+              </label>
+              <span className="text-[10px] text-[#64748B]">e.g. CS101, MATH201, AI-SEC1</span>
+            </div>
+            <input
+              id="course-code-input"
+              type="text"
+              placeholder="e.g. CS101"
+              value={subjectCode}
+              onChange={(e) => setSubjectCode(e.target.value.toUpperCase())}
+              className="w-full px-3.5 py-2.5 rounded-xl border border-[#E2E8F0] bg-white font-mono uppercase tracking-wider text-xs text-[#0F172A] focus:outline-none focus:border-[#4F46E5] focus:ring-1 focus:ring-[#4F46E5]"
+              disabled={isSubmitting}
+              maxLength={16}
+            />
+            <p className="text-[10px] text-[#64748B]">
+              Students will enter this code to join your class roster.
+            </p>
+          </div>
+
           <div className="pt-2 flex items-center justify-end gap-2">
             <button
               type="button"
@@ -120,7 +146,7 @@ export default function CreateSubjectModal({
             </button>
             <button
               type="submit"
-              disabled={isSubmitting || !name.trim() || !section.trim()}
+              disabled={isSubmitting || !name.trim() || !section.trim() || !subjectCode.trim()}
               className="px-5 py-2 rounded-xl bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-bold shadow-2xs transition-colors flex items-center gap-1.5 disabled:opacity-50"
             >
               {isSubmitting ? (
