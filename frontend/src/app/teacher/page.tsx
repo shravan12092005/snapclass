@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
 import { Subject } from "@/types";
-import { GraduationCap, Camera, BookOpen, BarChart3, Plus, Loader2 } from "lucide-react";
+import { GraduationCap, Camera, BookOpen, BarChart3, Loader2 } from "lucide-react";
 import StatusBadge from "@/components/StatusBadge";
 import TakeAttendanceTab from "@/components/teacher/TakeAttendanceTab";
 import ManageSubjectsTab from "@/components/teacher/ManageSubjectsTab";
@@ -61,44 +61,33 @@ export default function TeacherDashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Teacher Header Banner */}
-      <div className="bg-white rounded-2xl border border-[#E2E8F0] p-6 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div className="h-12 w-12 rounded-xl bg-[#EEF2FF] border border-[#C7D2FE] flex items-center justify-center text-[#4F46E5]">
-            <GraduationCap className="h-6 w-6" />
+      {/* Teacher Header Banner - Compact One Line */}
+      <div className="bg-white rounded-2xl border border-[#E2E8F0] px-5 py-3.5 shadow-xs flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="h-9 w-9 rounded-xl bg-[#EEF2FF] border border-[#C7D2FE] flex items-center justify-center text-[#4F46E5] shrink-0">
+            <GraduationCap className="h-5 w-5" />
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold text-[#0F172A]">
-                Welcome, {teacher?.name || teacher?.username || "Instructor"}
-              </h1>
-              <StatusBadge status="success">Verified Faculty</StatusBadge>
-            </div>
-            <p className="text-xs text-[#64748B] mt-0.5">
-              Faculty ID #{teacher?.teacher_id} &bull; {subjects.length} Active{" "}
-              {subjects.length === 1 ? "Course" : "Courses"} Managed
-            </p>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h1 className="text-lg font-bold text-[#0F172A]">
+              Welcome, {teacher?.name || teacher?.username || "Instructor"}
+            </h1>
+            <span className="text-[#94A3B8] text-xs">&bull;</span>
+            <span className="text-xs font-medium text-[#64748B]">
+              {subjects.length} {subjects.length === 1 ? "course" : "courses"}
+            </span>
+            <StatusBadge status="success">Verified Faculty</StatusBadge>
           </div>
         </div>
-
-        <button
-          type="button"
-          onClick={() => setQuickCreateOpen(true)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#4F46E5] text-white text-xs font-semibold hover:bg-[#4338CA] shadow-2xs transition-colors"
-        >
-          <Plus className="h-4 w-4" />
-          <span>Create New Course</span>
-        </button>
       </div>
 
-      {/* Segmented Tab Navigation Bar */}
-      <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-xs p-2 flex flex-wrap gap-2">
+      {/* Segmented Tab Navigation Bar - Scrollable on small screens */}
+      <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-xs p-1.5 flex overflow-x-auto gap-1.5">
         <button
           type="button"
           onClick={() => setActiveTab("attendance")}
-          className={`flex-1 min-w-[140px] inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+          className={`flex-1 min-w-[140px] inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5] ${
             activeTab === "attendance"
-              ? "bg-[#EEF2FF] text-[#4F46E5] border border-[#C7D2FE] shadow-2xs"
+              ? "bg-[#EEF2FF] text-[#4F46E5] shadow-xs"
               : "text-[#64748B] hover:text-[#0F172A] hover:bg-[#F8FAFC]"
           }`}
         >
@@ -109,9 +98,9 @@ export default function TeacherDashboard() {
         <button
           type="button"
           onClick={() => setActiveTab("subjects")}
-          className={`flex-1 min-w-[140px] inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+          className={`flex-1 min-w-[140px] inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5] ${
             activeTab === "subjects"
-              ? "bg-[#EEF2FF] text-[#4F46E5] border border-[#C7D2FE] shadow-2xs"
+              ? "bg-[#EEF2FF] text-[#4F46E5] shadow-xs"
               : "text-[#64748B] hover:text-[#0F172A] hover:bg-[#F8FAFC]"
           }`}
         >
@@ -122,9 +111,9 @@ export default function TeacherDashboard() {
         <button
           type="button"
           onClick={() => setActiveTab("records")}
-          className={`flex-1 min-w-[140px] inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+          className={`flex-1 min-w-[140px] inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5] ${
             activeTab === "records"
-              ? "bg-[#EEF2FF] text-[#4F46E5] border border-[#C7D2FE] shadow-2xs"
+              ? "bg-[#EEF2FF] text-[#4F46E5] shadow-xs"
               : "text-[#64748B] hover:text-[#0F172A] hover:bg-[#F8FAFC]"
           }`}
         >

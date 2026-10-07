@@ -287,34 +287,46 @@ export default function TakeAttendanceTab({
         )}
       </div>
 
-      {/* Verification Mode Segmented Control */}
+      {/* Flattened Mode Selection: Single Clear Choice */}
       <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-xs overflow-hidden">
-        <div className="p-2 border-b border-[#E2E8F0] bg-[#F8FAFC] flex gap-2">
-          <button
-            type="button"
-            onClick={() => setActiveMode("face")}
-            className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
-              activeMode === "face"
-                ? "bg-white text-[#4F46E5] shadow-xs border border-[#C7D2FE]"
-                : "text-[#64748B] hover:text-[#0F172A] hover:bg-white/60"
-            }`}
-          >
-            <Camera className="h-4 w-4" />
-            <span>Classroom Photo Face Scan</span>
-          </button>
+        <div className="p-3 border-b border-[#E2E8F0] bg-[#F8FAFC]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setActiveMode("face")}
+              className={`p-3 rounded-xl text-left transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5] ${
+                activeMode === "face"
+                  ? "bg-white text-[#4F46E5] shadow-xs border border-[#C7D2FE]"
+                  : "bg-transparent text-[#64748B] hover:bg-white/60 hover:text-[#0F172A]"
+              }`}
+            >
+              <div className="flex items-center gap-2 font-bold text-xs sm:text-sm">
+                <Camera className="h-4 w-4 text-[#4F46E5]" />
+                <span>Class photos</span>
+              </div>
+              <p className="text-[11px] text-[#64748B] mt-1 font-normal leading-tight">
+                Use 1-3 clear photos, good lighting, faces visible
+              </p>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveMode("voice")}
-            className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
-              activeMode === "voice"
-                ? "bg-white text-[#4F46E5] shadow-xs border border-[#C7D2FE]"
-                : "text-[#64748B] hover:text-[#0F172A] hover:bg-white/60"
-            }`}
-          >
-            <Mic className="h-4 w-4" />
-            <span>Classroom Audio Voice Attendance</span>
-          </button>
+            <button
+              type="button"
+              onClick={() => setActiveMode("voice")}
+              className={`p-3 rounded-xl text-left transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5] ${
+                activeMode === "voice"
+                  ? "bg-white text-[#4F46E5] shadow-xs border border-[#C7D2FE]"
+                  : "bg-transparent text-[#64748B] hover:bg-white/60 hover:text-[#0F172A]"
+              }`}
+            >
+              <div className="flex items-center gap-2 font-bold text-xs sm:text-sm">
+                <Mic className="h-4 w-4 text-[#4F46E5]" />
+                <span>Voice recording</span>
+              </div>
+              <p className="text-[11px] text-[#64748B] mt-1 font-normal leading-tight">
+                Record 5-10s roll-call audio of students saying &apos;present&apos;, or upload audio
+              </p>
+            </button>
+          </div>
         </div>
 
         {errorMsg && (
@@ -325,26 +337,26 @@ export default function TakeAttendanceTab({
         )}
 
         {/* ----------------------------------------------------------------- */}
-        {/* MODE A: Face Scan                                                 */}
+        {/* MODE A: Class photos                                              */}
         {/* ----------------------------------------------------------------- */}
         {activeMode === "face" && (
           <div className="p-6 space-y-6">
-            {/* Input Method Toggle */}
-            <div className="flex items-center gap-2">
+            {/* Input Method Small Toggle */}
+            <div className="flex items-center gap-1.5 p-1 bg-[#F1F5F9] rounded-xl border border-[#E2E8F0] w-fit">
               <button
                 type="button"
                 onClick={() => {
                   setPhotoInputType("upload");
                   stopCameraStream();
                 }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5] ${
                   photoInputType === "upload"
-                    ? "bg-[#EEF2FF] text-[#4F46E5] border border-[#C7D2FE]"
+                    ? "bg-white text-[#4F46E5] shadow-xs"
                     : "text-[#64748B] hover:text-[#0F172A]"
                 }`}
               >
                 <Upload className="h-3.5 w-3.5" />
-                <span>Upload Photos</span>
+                <span>Upload</span>
               </button>
 
               <button
@@ -353,14 +365,14 @@ export default function TakeAttendanceTab({
                   setPhotoInputType("camera");
                   startCameraStream();
                 }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5] ${
                   photoInputType === "camera"
-                    ? "bg-[#EEF2FF] text-[#4F46E5] border border-[#C7D2FE]"
+                    ? "bg-white text-[#4F46E5] shadow-xs"
                     : "text-[#64748B] hover:text-[#0F172A]"
                 }`}
               >
                 <Video className="h-3.5 w-3.5" />
-                <span>Camera Snapshot</span>
+                <span>Camera</span>
               </button>
             </div>
 
@@ -474,7 +486,7 @@ export default function TakeAttendanceTab({
                 type="button"
                 onClick={handleRunAnalysis}
                 disabled={isAnalyzing || stagedPhotos.length === 0}
-                className="w-full sm:w-auto px-6 py-3 rounded-xl bg-[#4F46E5] hover:bg-[#4338CA] disabled:opacity-50 text-white text-xs font-bold shadow-xs transition-colors flex items-center justify-center gap-2"
+                className="w-full sm:w-auto px-6 py-3 rounded-xl bg-[#4F46E5] hover:bg-[#4338CA] disabled:bg-[#CBD5E1] disabled:text-[#475569] disabled:cursor-not-allowed disabled:shadow-none text-white text-xs font-bold shadow-xs transition-colors flex items-center justify-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]"
               >
                 {isAnalyzing ? (
                   <>
@@ -566,7 +578,7 @@ export default function TakeAttendanceTab({
                 type="button"
                 onClick={handleRunAnalysis}
                 disabled={isAnalyzing || !audioBlob}
-                className="w-full sm:w-auto px-6 py-3 rounded-xl bg-[#4F46E5] hover:bg-[#4338CA] disabled:opacity-50 text-white text-xs font-bold shadow-xs transition-colors flex items-center justify-center gap-2"
+                className="w-full sm:w-auto px-6 py-3 rounded-xl bg-[#4F46E5] hover:bg-[#4338CA] disabled:bg-[#CBD5E1] disabled:text-[#475569] disabled:cursor-not-allowed disabled:shadow-none text-white text-xs font-bold shadow-xs transition-colors flex items-center justify-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5]"
               >
                 {isAnalyzing ? (
                   <>

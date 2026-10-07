@@ -15,6 +15,7 @@ import {
   Loader2,
   AlertCircle,
   RefreshCw,
+  ChevronDown,
 } from "lucide-react";
 import StatusBadge from "@/components/StatusBadge";
 import { getAttendanceRateInfo } from "@/lib/rateColor";
@@ -23,6 +24,7 @@ export default function AttendanceRecordsTab() {
   const [sessions, setSessions] = useState<AttendanceSessionSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
+  const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
 
   // Filter states
   const [datePreset, setDatePreset] = useState<"today" | "7d" | "30d" | "all" | "custom">("30d");
@@ -482,23 +484,110 @@ export default function AttendanceRecordsTab() {
                   const rate = session.rate ?? 0;
                   const total = session.total_count ?? 1;
                   const rateInfo = getAttendanceRateInfo(rate, total);
+                  const isExpanded = expandedRows.has(idx);
+                  const presentCount = session.present_count ?? 0;
+                  const absentCount = Math.max(0, (session.total_count ?? 0) - presentCount);
+
+                  const toggleExpand = () => {
+                    setExpandedRows((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(idx)) next.delete(idx);
+                      else next.add(idx);
+                      return next;
+                    });
+                  };
 
                   return (
-                    <tr key={idx} className="hover:bg-[#F8FAFC] transition-colors">
-                      <td className="py-3 px-4 font-medium text-[#0F172A] whitespace-nowrap">
-                        {session.Time}
-                      </td>
-                      <td className="py-3 px-4 font-semibold text-[#0F172A]">{session.Subject}</td>
-                      <td className="py-3 px-4">
-                        <span className="px-2 py-0.5 rounded font-mono text-[11px] bg-[#F1F5F9] text-[#334155] border border-[#E2E8F0]">
-                          {session.Subject_Code}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-[#0F172A]">{session.Attendance_Stats}</td>
-                      <td className="py-3 px-4 text-right">
-                        <StatusBadge status={rateInfo.status}>{rateInfo.label}</StatusBadge>
-                      </td>
-                    </tr>
+                    <React.Fragment key={idx}>
+                      <tr
+                        onClick={toggleExpand}
+                        className="hover:bg-[#F8FAFC] transition-colors cursor-pointer select-none"
+                      >
+                        <td className="py-3 px-4 font-medium text-[#0F172A] whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <ChevronDown
+                              className={`h-4 w-4 text-[#64748B] transition-transform duration-200 ${
+                                isExpanded ? "rotate-180 text-[#4F46E5]" : ""
+                              }`}
+                            />
+                            <span>{session.Time}</span>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 font-semibold text-[#0F172A]">{session.Subject}</td>
+                        <td className="py-3 px-4">
+                          <span className="px-2 py-0.5 rounded font-mono text-[11px] bg-[#F1F5F9] text-[#334155] border border-[#E2E8F0]">
+                            {session.Subject_Code}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-[#0F172A]">{session.Attendance_Stats}</td>
+                        <td className="py-3 px-4 text-right">
+                          <StatusBadge status={rateInfo.status}>{rateInfo.label}</StatusBadge>
+                        </td>
+                      </tr>
+
+                      {isExpanded && (
+                        <tr className="bg-[#F8FAFC]/80 border-b border-[#E2E8F0]">
+                          <td colSpan={5} className="py-3.5 px-6">
+                            <div className="space-y-3">
+                              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E2E8F0] pb-2">
+                                <span className="text-xs font-bold text-[#0F172A]">
+                                  Session Roster Breakdown &bull; {session.Subject} ({session.Subject_Code})
+                                </span>
+                                <div className="flex items-center gap-2">
+                                  <StatusBadge status="success">
+                                    Present: {presentCount}
+                                  </StatusBadge>
+                                  <StatusBadge status={absentCount > 0 ? "danger" : "neutral"}>
+                                    Absent: {absentCount}
+                                  </StatusBadge>
+                                </div>
+                              </div>
+
+                              {/* Student presence items if returned, or fallback note */}
+                              {(session as any).students && Array.isArray((session as any).students) ? (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                                  {(session as any).students.map((st: any) => (
+                                    <div
+                                      key={st.student_id || st.name}
+                                      className="flex items-center justify-between p-2 rounded-xl bg-white border border-[#E2E8F0] text-xs shadow-2xs"
+                                    >
+                                      <div>
+                                        <span className="font-semibold text-[#0F172A] block">{st.name}</span>
+                                        {st.student_id && (
+                                          <span className="text-[10px] text-[#64748B]">ID #{st.student_id}</span>
+                                        )}
+                                      </div>
+                                      <StatusBadge status={st.is_present ? "success" : "danger"}>
+                                        {st.is_present ? "Present" : "Absent"}
+                                      </StatusBadge>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="p-3 rounded-xl bg-white border border-[#E2E8F0] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs">
+                                  <div className="flex items-center gap-3">
+                                    <span className="text-[#64748B]">
+                                      Total enrolled: <strong className="text-[#0F172A]">{session.total_count ?? 0} students</strong>
+                                    </span>
+                                    <span className="text-[#E2E8F0]">&bull;</span>
+                                    <span className="text-[#047857]">
+                                      Verified: <strong>{presentCount} present</strong>
+                                    </span>
+                                    <span className="text-[#E2E8F0]">&bull;</span>
+                                    <span className="text-[#B91C1C]">
+                                      Unverified: <strong>{absentCount} absent</strong>
+                                    </span>
+                                  </div>
+                                  <span className="text-[11px] text-[#94A3B8] italic">
+                                    (Per-student roster log requires backend records expansion)
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   );
                 })}
               </tbody>
