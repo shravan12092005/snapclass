@@ -35,8 +35,8 @@ export default function AttendanceReviewModal({
   onSaved,
 }: AttendanceReviewModalProps) {
   // Local state for interactive overrides
-  const [logs, setLogs] = useState<AttendanceLogEntry[]>(initialLogs);
-  const [filter, setFilter] = useState<"all" | "present" | "absent">("all");
+  const [logs, setLogs] = useState<AttendanceLogEntry[]>([]);
+  const [filter, setFilter] = useState<"all" | "present" | "absent" | "no_profile">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -56,11 +56,6 @@ export default function AttendanceReviewModal({
     retry,
   } = useProcessing();
 
-  // Sync if initialLogs change
-  React.useEffect(() => {
-    setLogs(initialLogs);
-  }, [initialLogs]);
-
   // Map student_id to result metadata (Name, Source, original Status)
   const resultMap = useMemo(() => {
     const map = new Map<number, AttendanceResultEntry>();
@@ -70,10 +65,46 @@ export default function AttendanceReviewModal({
     return map;
   }, [results]);
 
+  // Sync if initialLogs or results change: guarantee ALL enrolled students in results are present in logs
+  React.useEffect(() => {
+    const logMap = new Map<number, AttendanceLogEntry>();
+    for (const l of initialLogs) {
+      logMap.set(l.student_id, l);
+    }
+
+    const subjectId = initialLogs[0]?.subject_id || 0;
+    const timestamp = initialLogs[0]?.timestamp || new Date().toISOString();
+
+    const mergedLogs: AttendanceLogEntry[] = results.map((r) => {
+      const existing = logMap.get(r.ID);
+      if (existing) return existing;
+      return {
+        student_id: r.ID,
+        subject_id: subjectId,
+        timestamp: timestamp,
+        is_present: false,
+      };
+    });
+
+    setLogs(mergedLogs);
+  }, [results, initialLogs]);
+
   // Derived metrics
   const totalCount = logs.length;
   const presentCount = useMemo(() => logs.filter((l) => l.is_present).length, [logs]);
-  const absentCount = totalCount - presentCount;
+  const noProfileCount = useMemo(() => {
+    return logs.filter((l) => {
+      const res = resultMap.get(l.student_id);
+      return !l.is_present && Boolean(res?.Status?.includes("No voice profile"));
+    }).length;
+  }, [logs, resultMap]);
+  const absentCount = useMemo(() => {
+    return logs.filter((l) => {
+      const res = resultMap.get(l.student_id);
+      const isNoProf = Boolean(res?.Status?.includes("No voice profile"));
+      return !l.is_present && !isNoProf;
+    }).length;
+  }, [logs, resultMap]);
   const presentPct = totalCount > 0 ? (presentCount / totalCount) * 100 : 0;
 
   // Toggle student status
@@ -93,6 +124,7 @@ export default function AttendanceReviewModal({
     return logs.filter((log) => {
       const res = resultMap.get(log.student_id);
       const name = res?.Name || `Student #${log.student_id}`;
+      const isNoProfile = Boolean(res?.Status?.includes("No voice profile"));
 
       // Search match
       if (searchQuery.trim()) {
@@ -104,7 +136,8 @@ export default function AttendanceReviewModal({
 
       // Filter tab match
       if (filter === "present") return log.is_present;
-      if (filter === "absent") return !log.is_present;
+      if (filter === "absent") return !log.is_present && !isNoProfile;
+      if (filter === "no_profile") return !log.is_present && isNoProfile;
       return true;
     });
   }, [logs, resultMap, filter, searchQuery]);
@@ -119,7 +152,20 @@ export default function AttendanceReviewModal({
     });
 
     try {
-      await api.saveAttendance(logs, { signal });
+      // Exclude students who had no voice profile and remained untoggled,
+      // so they aren't falsely recorded as absent in attendance logs.
+      const logsToSave = logs.filter((log) => {
+        const res = resultMap.get(log.student_id);
+        const isNoProfile = Boolean(res?.Status?.includes("No voice profile"));
+        if (isNoProfile && !log.is_present) {
+          return false;
+        }
+        return true;
+      });
+
+      if (logsToSave.length > 0) {
+        await api.saveAttendance(logsToSave, { signal });
+      }
       await showSuccess("Attendance session saved!", 600);
       onSaved();
       onClose();
@@ -261,6 +307,19 @@ export default function AttendanceReviewModal({
               >
                 Absent ({absentCount})
               </button>
+              {noProfileCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setFilter("no_profile")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                    filter === "no_profile"
+                      ? "bg-white text-[#B45309] shadow-xs border border-[#FDE68A]"
+                      : "text-[#64748B] hover:text-[#0F172A]"
+                  }`}
+                >
+                  No Profile ({noProfileCount})
+                </button>
+              )}
             </div>
 
             {/* Search Input */}
@@ -275,6 +334,16 @@ export default function AttendanceReviewModal({
               />
             </div>
           </div>
+
+          {/* Unprofiled Students Warning Banner */}
+          {noProfileCount > 0 && (
+            <div className="p-3 rounded-xl bg-[#FFFBEB] border border-[#FDE68A] flex items-center gap-2 text-xs text-[#B45309]">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              <span>
+                {noProfileCount} enrolled student{noProfileCount > 1 ? "s do" : " does"} not have a voice profile yet. You can manually verify and mark them present below.
+              </span>
+            </div>
+          )}
 
           {/* Student Cards Grid */}
           {filteredStudents.length === 0 ? (
