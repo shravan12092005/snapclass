@@ -24,7 +24,9 @@ export default function CameraCapture({
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
   const [videoReady, setVideoReady] = useState(false);
-  const [useUploadFallback, setUseUploadFallback] = useState(false);
+  const [useUploadFallback, setUseUploadFallback] = useState(() => {
+    return typeof window !== "undefined" && window.location.search.includes("mode=upload");
+  });
 
   // ── Start camera ──────────────────────────────────────────────────────
   const startCamera = useCallback(async () => {

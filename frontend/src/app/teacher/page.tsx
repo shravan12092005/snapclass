@@ -89,7 +89,7 @@ function TeacherDashboardContent() {
             <span className="text-xs font-medium text-[#64748B]">
               {subjects.length} {subjects.length === 1 ? "course" : "courses"}
             </span>
-            <StatusBadge status="success">Verified Faculty</StatusBadge>
+            <StatusBadge status="success">Teacher</StatusBadge>
           </div>
         </div>
       </div>

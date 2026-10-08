@@ -16,11 +16,13 @@ export default function ShareSubjectModal({ isOpen, onClose, subject }: ShareSub
   const [copiedLink, setCopiedLink] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState<string>("");
 
-  const joinUrl = typeof window !== "undefined" && subject
-    ? `${window.location.origin}/?join-code=${subject.subject_code}`
-    : subject
-    ? `http://localhost:3000/?join-code=${subject.subject_code}`
-    : "";
+  const baseDomain =
+    typeof window !== "undefined" &&
+    !window.location.hostname.includes("localhost") &&
+    !window.location.hostname.includes("127.0.0.1")
+      ? window.location.origin
+      : "https://snapclass.app";
+  const joinUrl = subject ? `${baseDomain}/student?join-code=${subject.subject_code}` : "";
 
   useEffect(() => {
     if (joinUrl) {

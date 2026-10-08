@@ -26,7 +26,7 @@ import {
 function BrowserFrame({
   src,
   alt,
-  urlText = "snapclass.edu/portal",
+  urlText = "snapclass.app/portal",
   priority = false,
   className = "",
 }: {
@@ -61,10 +61,11 @@ function BrowserFrame({
           src={src}
           alt={alt}
           fill
+          unoptimized={true}
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 600px"
           priority={priority}
           className="object-cover object-top"
-          loading={priority ? undefined : "lazy"}
+          loading="eager"
         />
       </div>
     </div>
@@ -208,10 +209,6 @@ export default function HomePage() {
                   <CheckCircle2 className="h-4 w-4 text-[#047857]" />
                   <span>Zero raw photo storage</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <CheckCircle2 className="h-4 w-4 text-[#047857]" />
-                  <span>Faculty verified</span>
-                </div>
               </div>
             </div>
 
@@ -223,7 +220,7 @@ export default function HomePage() {
                   <BrowserFrame
                     src="/landing/teacher_dashboard.webp"
                     alt="SnapClass Teacher Dashboard showing active courses and attendance metrics"
-                    urlText="snapclass.edu/teacher"
+                    urlText="snapclass.app/teacher"
                     priority={true}
                     className="shadow-2xl ring-1 ring-black/5"
                   />
@@ -235,7 +232,12 @@ export default function HomePage() {
                     <ShieldCheck className="h-5 w-5" />
                   </div>
                   <div>
-                    <div className="text-xs font-bold text-[#0F172A]">AI Roster Matched</div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-[#0F172A]">AI Roster Matched</span>
+                      <span className="text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-[#EEF2FF] text-[#4F46E5]">
+                        Example
+                      </span>
+                    </div>
                     <div className="text-[10px] text-[#64748B]">Instant classroom verification</div>
                   </div>
                 </div>
@@ -341,7 +343,7 @@ export default function HomePage() {
           </div>
 
           {/* 7-Step Alternating Timeline */}
-          <div className="space-y-16 lg:space-y-24">
+          <div className="space-y-10 lg:space-y-12">
             {/* Step 1: Secure Login */}
             <RevealOnScroll>
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
@@ -351,18 +353,23 @@ export default function HomePage() {
                   </span>
                   <h3 className="text-2xl font-bold text-[#0F172A]">Secure Login</h3>
                   <p className="text-sm text-[#64748B] leading-relaxed">
-                    Start your session with verified faculty authentication. Signed HTTP cookies ensure protected access to course configurations and attendance rosters.
+                    Start your session with verified teacher authentication. Signed HTTP cookies ensure protected access to course configurations and attendance rosters.
                   </p>
                 </div>
                 <div className="lg:col-span-7">
                   <BrowserFrame
                     src="/landing/teacher_login.webp"
                     alt="SnapClass Teacher Login screen with clean authentication interface"
-                    urlText="snapclass.edu/teacher/login"
+                    urlText="snapclass.app/teacher/login"
                   />
                 </div>
               </div>
             </RevealOnScroll>
+
+            {/* Connector */}
+            <div className="flex justify-center -my-3 sm:-my-4" aria-hidden="true">
+              <div className="w-px h-8 sm:h-10 bg-gradient-to-b from-[#CBD5E1] to-[#E2E8F0]" />
+            </div>
 
             {/* Step 2: Interactive Dashboard */}
             <RevealOnScroll>
@@ -380,11 +387,16 @@ export default function HomePage() {
                   <BrowserFrame
                     src="/landing/teacher_dashboard.webp"
                     alt="SnapClass Interactive Teacher Dashboard with summary KPI cards"
-                    urlText="snapclass.edu/teacher"
+                    urlText="snapclass.app/teacher"
                   />
                 </div>
               </div>
             </RevealOnScroll>
+
+            {/* Connector */}
+            <div className="flex justify-center -my-3 sm:-my-4" aria-hidden="true">
+              <div className="w-px h-8 sm:h-10 bg-gradient-to-b from-[#CBD5E1] to-[#E2E8F0]" />
+            </div>
 
             {/* Step 3: Course Management */}
             <RevealOnScroll>
@@ -402,11 +414,16 @@ export default function HomePage() {
                   <BrowserFrame
                     src="/landing/teacher_courses.webp"
                     alt="SnapClass Course Management screen with custom course code input"
-                    urlText="snapclass.edu/teacher#courses"
+                    urlText="snapclass.app/teacher#courses"
                   />
                 </div>
               </div>
             </RevealOnScroll>
+
+            {/* Connector */}
+            <div className="flex justify-center -my-3 sm:-my-4" aria-hidden="true">
+              <div className="w-px h-8 sm:h-10 bg-gradient-to-b from-[#CBD5E1] to-[#E2E8F0]" />
+            </div>
 
             {/* Step 4: Share Class Access */}
             <RevealOnScroll>
@@ -424,11 +441,16 @@ export default function HomePage() {
                   <BrowserFrame
                     src="/landing/teacher_share_qr.webp"
                     alt="SnapClass Share Course Modal showing QR code and unique joining link"
-                    urlText="snapclass.edu/teacher/share"
+                    urlText="snapclass.app/teacher/share"
                   />
                 </div>
               </div>
             </RevealOnScroll>
+
+            {/* Connector */}
+            <div className="flex justify-center -my-3 sm:-my-4" aria-hidden="true">
+              <div className="w-px h-8 sm:h-10 bg-gradient-to-b from-[#CBD5E1] to-[#E2E8F0]" />
+            </div>
 
             {/* Step 5: Face Attendance */}
             <RevealOnScroll>
@@ -446,11 +468,16 @@ export default function HomePage() {
                   <BrowserFrame
                     src="/landing/teacher_face_attendance.webp"
                     alt="SnapClass Live Face Attendance scanning and detection review"
-                    urlText="snapclass.edu/teacher/attendance"
+                    urlText="snapclass.app/teacher/attendance"
                   />
                 </div>
               </div>
             </RevealOnScroll>
+
+            {/* Connector */}
+            <div className="flex justify-center -my-3 sm:-my-4" aria-hidden="true">
+              <div className="w-px h-8 sm:h-10 bg-gradient-to-b from-[#CBD5E1] to-[#E2E8F0]" />
+            </div>
 
             {/* Step 6: Voice Attendance */}
             <RevealOnScroll>
@@ -468,11 +495,16 @@ export default function HomePage() {
                   <BrowserFrame
                     src="/landing/teacher_voice_attendance.webp"
                     alt="SnapClass Voice Attendance recording audio waveforms"
-                    urlText="snapclass.edu/teacher/voice"
+                    urlText="snapclass.app/teacher/voice"
                   />
                 </div>
               </div>
             </RevealOnScroll>
+
+            {/* Connector */}
+            <div className="flex justify-center -my-3 sm:-my-4" aria-hidden="true">
+              <div className="w-px h-8 sm:h-10 bg-gradient-to-b from-[#CBD5E1] to-[#E2E8F0]" />
+            </div>
 
             {/* Step 7: Records and Analytics */}
             <RevealOnScroll>
@@ -490,7 +522,7 @@ export default function HomePage() {
                   <BrowserFrame
                     src="/landing/teacher_review_records.webp"
                     alt="SnapClass Attendance Review and Analytics modal with manual toggles"
-                    urlText="snapclass.edu/teacher/records"
+                    urlText="snapclass.app/teacher/records"
                   />
                 </div>
               </div>
@@ -524,7 +556,7 @@ export default function HomePage() {
                   <BrowserFrame
                     src="/landing/student_enroll.webp"
                     alt="Student entering 7-character course code to self-enroll"
-                    urlText="snapclass.edu/student/enroll"
+                    urlText="snapclass.app/student/enroll"
                   />
                 </div>
                 <div className="px-2 space-y-2">
@@ -546,7 +578,7 @@ export default function HomePage() {
                   <BrowserFrame
                     src="/landing/student_register.webp"
                     alt="Student facial capture and explicit privacy consent checkbox"
-                    urlText="snapclass.edu/student/register"
+                    urlText="snapclass.app/student/register"
                   />
                 </div>
                 <div className="px-2 space-y-2">
@@ -568,7 +600,7 @@ export default function HomePage() {
                   <BrowserFrame
                     src="/landing/student_dashboard.webp"
                     alt="Student dashboard showing verified classes attended and progress"
-                    urlText="snapclass.edu/student"
+                    urlText="snapclass.app/student"
                   />
                 </div>
                 <div className="px-2 space-y-2">
@@ -688,7 +720,7 @@ export default function HomePage() {
               <div className="text-xs font-bold uppercase tracking-wider text-[#4F46E5]">Database</div>
               <h3 className="text-base font-bold text-[#0F172A]">Supabase Cloud</h3>
               <p className="text-xs text-[#64748B] leading-relaxed">
-                PostgreSQL cloud database storing encrypted credentials, course rosters, and numeric biometric vectors.
+                PostgreSQL cloud database storing hashed passwords, course rosters, and numeric biometric vectors.
               </p>
             </div>
 
@@ -758,7 +790,7 @@ export default function HomePage() {
               Privacy First by Design
             </h2>
             <p className="text-sm sm:text-base text-[#64748B]">
-              Only what is implemented: strictly verified security controls and ethical biometric handling.
+              How SnapClass protects student data.
             </p>
           </div>
 
@@ -859,7 +891,7 @@ export default function HomePage() {
       {/* =========================================================================
           CLOSING CTA SECTION
          ========================================================================= */}
-      <section className="w-full py-16 md:py-24 bg-gradient-to-br from-[#4F46E5] to-[#4338CA] text-white">
+      <section id="cta" className="w-full py-16 md:py-24 bg-gradient-to-br from-[#4F46E5] to-[#4338CA] text-white">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-6">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-white/90 text-xs font-semibold backdrop-blur-xs border border-white/20">
             <Sparkles className="h-3.5 w-3.5" />

@@ -28,7 +28,7 @@ export default function Navbar() {
   useEffect(() => {
     if (!isHomePage) return;
 
-    const sectionIds = ["top", "features", "teachers", "students", "tech"];
+    const sectionIds = ["top", "features", "teachers", "students", "tech", "privacy", "faq", "cta"];
     const handleScroll = () => {
       const scrollPosition = window.scrollY + 100;
 
@@ -132,6 +132,26 @@ export default function Navbar() {
                   }`}
                 >
                   Tech
+                </a>
+                <a
+                  href="#privacy"
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                    activeSection === "privacy"
+                      ? "text-[#4F46E5] bg-[#EEF2FF]"
+                      : "text-[#64748B] hover:text-[#0F172A] hover:bg-[#F8FAFC]"
+                  }`}
+                >
+                  Privacy
+                </a>
+                <a
+                  href="#faq"
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                    activeSection === "faq" || activeSection === "cta"
+                      ? "text-[#4F46E5] bg-[#EEF2FF]"
+                      : "text-[#64748B] hover:text-[#0F172A] hover:bg-[#F8FAFC]"
+                  }`}
+                >
+                  FAQ
                 </a>
               </nav>
 
@@ -295,6 +315,28 @@ export default function Navbar() {
                     }`}
                   >
                     Tech Stack
+                  </a>
+                  <a
+                    href="#privacy"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`px-3 py-2 rounded-xl text-sm font-semibold ${
+                      activeSection === "privacy"
+                        ? "text-[#4F46E5] bg-[#EEF2FF]"
+                        : "text-[#64748B] hover:bg-[#F8FAFC]"
+                    }`}
+                  >
+                    Privacy
+                  </a>
+                  <a
+                    href="#faq"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`px-3 py-2 rounded-xl text-sm font-semibold ${
+                      activeSection === "faq" || activeSection === "cta"
+                        ? "text-[#4F46E5] bg-[#EEF2FF]"
+                        : "text-[#64748B] hover:bg-[#F8FAFC]"
+                    }`}
+                  >
+                    FAQ
                   </a>
                 </div>
 
