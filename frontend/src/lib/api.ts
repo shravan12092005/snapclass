@@ -191,7 +191,17 @@ export const api = {
     formData.append("consent", consent ? "true" : "false");
     formData.append("image", imageBlob, "face_profile.jpg");
     if (audioBlob) {
-      formData.append("audio", audioBlob, "voice_sample.webm");
+      let ext = "wav";
+      if (audioBlob.type.includes("wav")) ext = "wav";
+      else if (audioBlob.type.includes("webm")) ext = "webm";
+      else if (audioBlob.type.includes("ogg")) ext = "ogg";
+      else if (audioBlob.type.includes("mp3") || audioBlob.type.includes("mpeg")) ext = "mp3";
+      else if ((audioBlob as File).name) {
+        const parts = (audioBlob as File).name.split(".");
+        if (parts.length > 1) ext = parts.pop()!;
+      }
+      const filename = (audioBlob as File).name || `voice_sample.${ext}`;
+      formData.append("audio", audioBlob, filename);
     }
 
     return uploadWithProgress<{ message: string; user: Student }>(
@@ -272,7 +282,16 @@ export const api = {
     options?: UploadOptions
   ): Promise<VoiceAttendanceResponse> {
     const formData = new FormData();
-    const filename = (audio as File).name || "classroom_audio.webm";
+    let ext = "wav";
+    if (audio.type.includes("wav")) ext = "wav";
+    else if (audio.type.includes("webm")) ext = "webm";
+    else if (audio.type.includes("ogg")) ext = "ogg";
+    else if (audio.type.includes("mp3") || audio.type.includes("mpeg")) ext = "mp3";
+    else if ((audio as File).name) {
+      const parts = (audio as File).name.split(".");
+      if (parts.length > 1) ext = parts.pop()!;
+    }
+    const filename = (audio as File).name || `classroom_audio.${ext}`;
     formData.append("audio", audio, filename);
 
     return uploadWithProgress<VoiceAttendanceResponse>(

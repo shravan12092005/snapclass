@@ -18,6 +18,7 @@ import AttendanceReviewModal from "./AttendanceReviewModal";
 import ProcessingOverlay from "@/components/ProcessingOverlay";
 import { useProcessing } from "@/hooks/useProcessing";
 import { scaleImageFile } from "@/lib/imageUtils";
+import { getSupportedAudioMimeType, convertBlobToWav } from "@/lib/audioUtils";
 
 interface TakeAttendanceTabProps {
   subjects: Subject[];
@@ -164,13 +165,19 @@ export default function TakeAttendanceTab({
   // Audio recording handlers
   const startAudioRecording = async () => {
     setErrorMsg("");
+    if (audioUrl) {
+      URL.revokeObjectURL(audioUrl);
+    }
     setAudioBlob(null);
     setAudioUrl(null);
     audioChunksRef.current = [];
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
+      const mime = getSupportedAudioMimeType();
+      const recorder = mime
+        ? new MediaRecorder(stream, { mimeType: mime })
+        : new MediaRecorder(stream);
       mediaRecorderRef.current = recorder;
 
       recorder.ondataavailable = (e) => {
@@ -179,10 +186,12 @@ export default function TakeAttendanceTab({
         }
       };
 
-      recorder.onstop = () => {
-        const fullBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
-        setAudioBlob(fullBlob);
-        setAudioUrl(URL.createObjectURL(fullBlob));
+      recorder.onstop = async () => {
+        const actualMime = recorder.mimeType || mime || "audio/webm";
+        const rawBlob = new Blob(audioChunksRef.current, { type: actualMime });
+        const finalBlob = await convertBlobToWav(rawBlob);
+        setAudioBlob(finalBlob);
+        setAudioUrl(URL.createObjectURL(finalBlob));
         stream.getTracks().forEach((t) => t.stop());
       };
 
@@ -208,6 +217,9 @@ export default function TakeAttendanceTab({
 
   const handleAudioUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !e.target.files[0]) return;
+    if (audioUrl) {
+      URL.revokeObjectURL(audioUrl);
+    }
     const file = e.target.files[0];
     setAudioBlob(file);
     setAudioUrl(URL.createObjectURL(file));
