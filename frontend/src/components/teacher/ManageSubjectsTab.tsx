@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import { Subject } from "@/types";
 import {
   BookOpen,
@@ -30,6 +31,7 @@ export default function ManageSubjectsTab({
   subjects,
   onRefreshSubjects,
 }: ManageSubjectsTabProps) {
+  const searchParams = useSearchParams();
   const [searchQuery, setSearchQuery] = useState("");
   const [copiedCodeId, setCopiedCodeId] = useState<number | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<number | null>(null);
@@ -39,6 +41,12 @@ export default function ManageSubjectsTab({
   const [shareSubject, setShareSubject] = useState<Subject | null>(null);
   const [deleteSubject, setDeleteSubject] = useState<Subject | null>(null);
   const [rosterSubject, setRosterSubject] = useState<Subject | null>(null);
+
+  useEffect(() => {
+    if (searchParams.get("modal") === "share" && subjects.length > 0) {
+      setShareSubject(subjects[0]);
+    }
+  }, [searchParams, subjects]);
 
   const handleCopyCode = async (subject: Subject, e: React.MouseEvent) => {
     e.stopPropagation();

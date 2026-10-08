@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
 import { Subject } from "@/types";
@@ -13,14 +13,32 @@ import AttendanceRecordsTab from "@/components/teacher/AttendanceRecordsTab";
 import CreateSubjectModal from "@/components/teacher/CreateSubjectModal";
 import { DashboardSkeleton } from "@/components/Skeleton";
 
-export default function TeacherDashboard() {
+function TeacherDashboardContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { currentUser, isLoading, isTeacher } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<"attendance" | "subjects" | "records">("attendance");
+  const tabParam = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState<"attendance" | "subjects" | "records">(
+    tabParam === "courses" || tabParam === "subjects"
+      ? "subjects"
+      : tabParam === "records"
+      ? "records"
+      : "attendance"
+  );
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [isLoadingSubjects, setIsLoadingSubjects] = useState(true);
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
+
+  useEffect(() => {
+    if (tabParam === "courses" || tabParam === "subjects") {
+      setActiveTab("subjects");
+    } else if (tabParam === "records") {
+      setActiveTab("records");
+    } else if (tabParam === "attendance") {
+      setActiveTab("attendance");
+    }
+  }, [tabParam]);
 
   // Authentication guard
   useEffect(() => {
@@ -152,5 +170,13 @@ export default function TeacherDashboard() {
         onSubjectCreated={fetchSubjects}
       />
     </div>
+  );
+}
+
+export default function TeacherDashboard() {
+  return (
+    <React.Suspense fallback={<DashboardSkeleton />}>
+      <TeacherDashboardContent />
+    </React.Suspense>
   );
 }

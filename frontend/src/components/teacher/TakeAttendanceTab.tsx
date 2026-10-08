@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { Subject, AttendanceResultEntry, AttendanceLogEntry } from "@/types";
 import { api, ApiError } from "@/lib/api";
 import {
@@ -29,18 +30,34 @@ export default function TakeAttendanceTab({
   onNavigateToSubjects,
   onAttendanceSaved,
 }: TakeAttendanceTabProps) {
+  const searchParams = useSearchParams();
   // Selected course
   const [selectedSubjectId, setSelectedSubjectId] = useState<number | "">("");
 
   // Scan mode
-  const [activeMode, setActiveMode] = useState<"face" | "voice">("face");
+  const [activeMode, setActiveMode] = useState<"face" | "voice">(
+    searchParams.get("mode") === "voice" ? "voice" : "face"
+  );
 
   // Face Scan State
-  const [photoInputType, setPhotoInputType] = useState<"upload" | "camera">("upload");
+  const [photoInputType, setPhotoInputType] = useState<"upload" | "camera">(
+    searchParams.get("input") === "camera" ? "camera" : "upload"
+  );
   const [stagedPhotos, setStagedPhotos] = useState<File[]>([]);
   const [cameraActive, setCameraActive] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+
+  useEffect(() => {
+    if (searchParams.get("mode") === "voice") {
+      setActiveMode("voice");
+    } else if (searchParams.get("mode") === "face") {
+      setActiveMode("face");
+    }
+    if (searchParams.get("input") === "camera") {
+      setPhotoInputType("camera");
+    }
+  }, [searchParams]);
 
   // Voice Scan State
   const [isRecording, setIsRecording] = useState(false);
