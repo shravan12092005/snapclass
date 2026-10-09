@@ -353,65 +353,108 @@ export default function AttendanceRecordsTab() {
           </span>
         </div>
 
-        {chartData.length < 2 ? (
+        {chartData.length < 4 ? (
           <div className="py-12 text-center text-xs text-[#64748B] bg-[#F8FAFC] rounded-xl border border-dashed border-[#E2E8F0]">
-            Not enough data yet. Trends appear after 2 or more sessions.
+            Not enough data yet. Trends appear after 4 or more sessions.
           </div>
         ) : (
           <div className="space-y-2">
-            <div className="relative h-56 w-full bg-[#F8FAFC] rounded-xl border border-[#E2E8F0] p-4 flex flex-col justify-between">
-              {/* SVG Trendline */}
-              <svg className="w-full h-full overflow-visible" preserveAspectRatio="none" viewBox="0 0 100 100">
-                <defs>
-                  <linearGradient id="trendGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#4F46E5" stopOpacity="0.25" />
-                    <stop offset="100%" stopColor="#4F46E5" stopOpacity="0.0" />
-                  </linearGradient>
-                </defs>
+            <div className="relative h-56 w-full bg-[#F8FAFC] rounded-xl border border-[#E2E8F0] p-4 overflow-hidden">
+              {(() => {
+                const PADDING_Y = 12;
+                const usableY = 100 - PADDING_Y * 2;
+                const pts = chartData.map((d, i) => {
+                  const x = (i / (chartData.length - 1)) * 100;
+                  const r = Math.min(100, Math.max(0, d.rate ?? 0));
+                  const y = PADDING_Y + (1 - r / 100) * usableY;
+                  return { x, y, data: d };
+                });
 
-                {/* Grid Lines */}
-                <line x1="0" y1="25" x2="100" y2="25" stroke="#E2E8F0" strokeDasharray="2" strokeWidth="0.5" />
-                <line x1="0" y1="50" x2="100" y2="50" stroke="#E2E8F0" strokeDasharray="2" strokeWidth="0.5" />
-                <line x1="0" y1="75" x2="100" y2="75" stroke="#E2E8F0" strokeDasharray="2" strokeWidth="0.5" />
+                const lineCmd = pts.reduce(
+                  (acc, p, i) => `${acc} ${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`,
+                  ""
+                );
+                const areaCmd = `${lineCmd} L 100 100 L 0 100 Z`;
 
-                {/* Path Generation */}
-                {(() => {
-                  const pts = chartData.map((d, i) => {
-                    const x = (i / (chartData.length - 1)) * 100;
-                    const r = d.rate ?? 0;
-                    const y = 100 - r; // 100% at top (y=0)
-                    return { x, y, data: d };
-                  });
+                return (
+                  <>
+                    {/* SVG Trendline & Grid */}
+                    <svg
+                      className="absolute inset-x-4 inset-y-4 w-[calc(100%-2rem)] h-[calc(100%-2rem)] overflow-visible"
+                      preserveAspectRatio="none"
+                      viewBox="0 0 100 100"
+                    >
+                      <defs>
+                        <linearGradient id="trendGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#4F46E5" stopOpacity="0.22" />
+                          <stop offset="100%" stopColor="#4F46E5" stopOpacity="0.0" />
+                        </linearGradient>
+                      </defs>
 
-                  const lineCmd = pts.reduce((acc, p, i) => `${acc} ${i === 0 ? "M" : "L"} ${p.x} ${p.y}`, "");
-                  const areaCmd = `${lineCmd} L ${pts[pts.length - 1].x} 100 L ${pts[0].x} 100 Z`;
+                      {/* Grid Lines */}
+                      <line
+                        x1="0"
+                        y1={PADDING_Y + 0.25 * usableY}
+                        x2="100"
+                        y2={PADDING_Y + 0.25 * usableY}
+                        stroke="#E2E8F0"
+                        strokeDasharray="3 3"
+                        strokeWidth="1"
+                        vectorEffect="non-scaling-stroke"
+                      />
+                      <line
+                        x1="0"
+                        y1={PADDING_Y + 0.5 * usableY}
+                        x2="100"
+                        y2={PADDING_Y + 0.5 * usableY}
+                        stroke="#E2E8F0"
+                        strokeDasharray="3 3"
+                        strokeWidth="1"
+                        vectorEffect="non-scaling-stroke"
+                      />
+                      <line
+                        x1="0"
+                        y1={PADDING_Y + 0.75 * usableY}
+                        x2="100"
+                        y2={PADDING_Y + 0.75 * usableY}
+                        stroke="#E2E8F0"
+                        strokeDasharray="3 3"
+                        strokeWidth="1"
+                        vectorEffect="non-scaling-stroke"
+                      />
 
-                  return (
-                    <>
+                      {/* Fill Area & Line Path */}
                       <path d={areaCmd} fill="url(#trendGradient)" />
-                      <path d={lineCmd} fill="none" stroke="#4F46E5" strokeWidth="2" strokeLinecap="round" />
+                      <path
+                        d={lineCmd}
+                        fill="none"
+                        stroke="#4F46E5"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        vectorEffect="non-scaling-stroke"
+                      />
+                    </svg>
+
+                    {/* Unstretched Circular HTML Markers */}
+                    <div className="absolute inset-x-4 inset-y-4 pointer-events-none">
                       {pts.map((p, idx) => (
-                        <circle
+                        <div
                           key={idx}
-                          cx={p.x}
-                          cy={p.y}
-                          r="3"
-                          fill="#4F46E5"
-                          stroke="#FFFFFF"
-                          strokeWidth="1.5"
-                          className="cursor-pointer hover:r-4 transition-all"
+                          style={{ left: `${p.x}%`, top: `${p.y}%` }}
+                          className="absolute -translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-[#4F46E5] border-2 border-white shadow-xs pointer-events-auto cursor-pointer hover:scale-125 transition-transform z-10"
                           onMouseEnter={() => setHoveredPoint(p.data)}
                           onMouseLeave={() => setHoveredPoint(null)}
                         />
                       ))}
-                    </>
-                  );
-                })()}
-              </svg>
+                    </div>
+                  </>
+                );
+              })()}
 
               {/* Hover Tooltip Overlay */}
               {hoveredPoint && (
-                <div className="absolute top-2 right-4 bg-white/95 backdrop-blur-xs border border-[#C7D2FE] shadow-sm rounded-lg p-2.5 text-xs text-[#0F172A] pointer-events-none z-10 animate-in fade-in duration-150">
+                <div className="absolute top-2 right-4 bg-white/95 backdrop-blur-xs border border-[#C7D2FE] shadow-sm rounded-lg p-2.5 text-xs text-[#0F172A] pointer-events-none z-20 animate-in fade-in duration-150">
                   <div className="font-bold">{hoveredPoint.Subject}</div>
                   <div className="text-[10px] text-[#64748B]">{hoveredPoint.Time}</div>
                   <div className="mt-1 flex items-center gap-2">

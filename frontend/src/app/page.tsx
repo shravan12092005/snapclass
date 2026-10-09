@@ -127,11 +127,11 @@ export default function HomePage() {
   const faqItems = [
     {
       q: "How accurate is AI face recognition in a classroom setting?",
-      a: "Detection accuracy depends on classroom lighting and photo clarity. SnapClass runs multi-scale dlib facial alignment and feature extraction. To guarantee complete academic fairness, instructors always review every detected student in the interactive review modal before records are saved.",
+      a: "Detection accuracy depends on classroom lighting and photo clarity. SnapClass runs multi-scale dlib facial alignment and feature extraction. Instructors review every detected student in the review screen before any record is saved.",
     },
     {
       q: "Are original student photos or voice recordings permanently stored?",
-      a: "No. Original classroom photos and voice recordings are processed in system memory and immediately discarded. Only irreversible, numeric mathematical embeddings (128-dimensional vectors) are stored in the database.",
+      a: "No. Classroom photos and voice recordings are processed temporarily to extract numeric face and voice embeddings and are not stored afterwards. Only the embeddings (128-dimensional face vectors and voice vectors) are saved in the database.",
     },
     {
       q: "What happens if a student's face is not recognized in the photo?",
@@ -340,6 +340,7 @@ export default function HomePage() {
             <p className="text-sm sm:text-base text-[#64748B]">
               From course creation to automated biometric verification and exported analytics in 7 structured steps.
             </p>
+            <p className="text-xs text-[#94A3B8]">Screenshots use sample data.</p>
           </div>
 
           {/* 7-Step Alternating Timeline */}
@@ -546,6 +547,7 @@ export default function HomePage() {
             <p className="text-sm sm:text-base text-[#64748B]">
               Seamless self-enrollment, transparent biometric consent, and clear personal attendance records.
             </p>
+            <p className="text-xs text-[#94A3B8]">Screenshots use sample data.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -652,7 +654,7 @@ export default function HomePage() {
               <div className="space-y-1">
                 <h3 className="text-base font-bold text-[#0F172A]">Take Attendance</h3>
                 <p className="text-xs text-[#64748B] leading-relaxed">
-                  Capture a classroom photo or switch to sequential voice mode. The AI pipeline runs detection in memory.
+                  Capture a classroom photo or switch to sequential voice mode. Inputs are processed temporarily to extract embeddings.
                 </p>
               </div>
             </div>
@@ -763,7 +765,7 @@ export default function HomePage() {
               <div className="bg-white border border-[#E2E8F0] p-4 rounded-xl shadow-2xs space-y-1">
                 <div className="text-xs font-bold text-[#0F172A]">Biometric Models</div>
                 <div className="text-[11px] text-[#4F46E5] font-semibold">dlib & Resemblyzer</div>
-                <div className="text-[10px] text-[#64748B]">Memory Vector Matching</div>
+                <div className="text-[10px] text-[#64748B]">Vector Matching</div>
               </div>
 
               {/* Step 4: Storage */}
