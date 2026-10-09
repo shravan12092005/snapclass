@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: snapclass-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: LOCKOUT_SECRET
+        generateValue: true
+      - key: CORS_ORIGINS
+        value: "*"
+      - key: LOCKOUT_IP_MAX_ATTEMPTS
+        value: "1000"
+      - key: DEV_MODE
+        value: "false"
