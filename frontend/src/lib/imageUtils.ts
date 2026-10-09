@@ -9,13 +9,26 @@ export async function scaleImageDataUrl(dataUrl: string, maxDim: number = 960): 
 
   return new Promise((resolve) => {
     const img = new Image();
+    let settled = false;
+
+    const cleanupAndResolve = (result: string) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(result);
+    };
+
+    const timer = setTimeout(() => {
+      cleanupAndResolve(dataUrl);
+    }, 5000);
+
     img.onload = () => {
       let width = img.naturalWidth || img.width;
       let height = img.naturalHeight || img.height;
 
       // Never upscale
       if (width <= maxDim && height <= maxDim) {
-        return resolve(dataUrl);
+        return cleanupAndResolve(dataUrl);
       }
 
       if (width > height) {
@@ -30,16 +43,16 @@ export async function scaleImageDataUrl(dataUrl: string, maxDim: number = 960): 
       canvas.width = width;
       canvas.height = height;
       const ctx = canvas.getContext("2d");
-      if (!ctx) return resolve(dataUrl);
+      if (!ctx) return cleanupAndResolve(dataUrl);
 
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = "high";
       ctx.drawImage(img, 0, 0, width, height);
 
-      resolve(canvas.toDataURL("image/jpeg", 0.9));
+      cleanupAndResolve(canvas.toDataURL("image/jpeg", 0.9));
     };
 
-    img.onerror = () => resolve(dataUrl);
+    img.onerror = () => cleanupAndResolve(dataUrl);
     img.src = dataUrl;
   });
 }
@@ -50,15 +63,30 @@ export async function scaleImageBlob(blob: Blob, maxDim: number = 960): Promise<
   return new Promise((resolve) => {
     const img = new Image();
     const url = URL.createObjectURL(blob);
+    let settled = false;
+
+    const cleanupAndResolve = (result: Blob) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      try {
+        URL.revokeObjectURL(url);
+      } catch {}
+      resolve(result);
+    };
+
+    // Safari safety timeout: resolve unscaled blob if image decode hangs
+    const timer = setTimeout(() => {
+      cleanupAndResolve(blob);
+    }, 5000);
 
     img.onload = () => {
-      URL.revokeObjectURL(url);
       let width = img.naturalWidth || img.width;
       let height = img.naturalHeight || img.height;
 
       // Never upscale
       if (width <= maxDim && height <= maxDim && blob.type === "image/jpeg") {
-        return resolve(blob);
+        return cleanupAndResolve(blob);
       }
 
       if (width > maxDim || height > maxDim) {
@@ -75,36 +103,49 @@ export async function scaleImageBlob(blob: Blob, maxDim: number = 960): Promise<
       canvas.width = width;
       canvas.height = height;
       const ctx = canvas.getContext("2d");
-      if (!ctx) return resolve(blob);
+      if (!ctx) return cleanupAndResolve(blob);
 
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = "high";
       ctx.drawImage(img, 0, 0, width, height);
 
-      canvas.toBlob(
-        (scaledBlob) => {
-          resolve(scaledBlob || blob);
-        },
-        "image/jpeg",
-        0.9
-      );
+      // Safari-safe conversion: toDataURL is 100% synchronous and avoids WebKit toBlob null drops
+      try {
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
+        cleanupAndResolve(dataUrlToBlob(dataUrl));
+      } catch {
+        canvas.toBlob(
+          (scaledBlob) => {
+            cleanupAndResolve(scaledBlob || blob);
+          },
+          "image/jpeg",
+          0.9
+        );
+      }
     };
 
     img.onerror = () => {
-      URL.revokeObjectURL(url);
-      resolve(blob);
+      cleanupAndResolve(blob);
     };
 
     img.src = url;
   });
 }
 
-export async function scaleImageFile(file: File, maxDim: number = 1280): Promise<File> {
+export async function scaleImageFile(file: File | Blob, maxDim: number = 1280): Promise<File | Blob> {
   const scaledBlob = await scaleImageBlob(file, maxDim);
-  return new File([scaledBlob], file.name.replace(/\.[^/.]+$/, ".jpg"), {
-    type: "image/jpeg",
-    lastModified: Date.now(),
-  });
+  const origName = (file as File).name || `classroom_photo_${Date.now()}.jpg`;
+  const newName = origName.replace(/\.[^/.]+$/, ".jpg");
+  try {
+    return new File([scaledBlob], newName, {
+      type: "image/jpeg",
+      lastModified: Date.now(),
+    });
+  } catch {
+    // Safari fallback if new File() is restricted
+    (scaledBlob as any).name = newName;
+    return scaledBlob;
+  }
 }
 
 export function dataUrlToBlob(dataUrl: string): Blob {

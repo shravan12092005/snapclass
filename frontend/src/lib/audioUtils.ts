@@ -142,7 +142,23 @@ export async function convertBlobToWav(blob: Blob): Promise<Blob> {
     if (!AudioContextClass) return blob;
 
     const audioCtx = new AudioContextClass();
-    const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+    if (audioCtx.state === "suspended") {
+      await audioCtx.resume().catch(() => {});
+    }
+
+    const audioBuffer: AudioBuffer = await new Promise((resolve, reject) => {
+      // arrayBuffer.slice prevents detachment issues across WebKit/Safari
+      const bufferCopy = arrayBuffer.slice(0);
+      const res = audioCtx.decodeAudioData(
+        bufferCopy,
+        (buf) => resolve(buf),
+        (err) => reject(err)
+      );
+      if (res && typeof res.then === "function") {
+        res.then(resolve).catch(reject);
+      }
+    });
+
     const channelData = audioBuffer.getChannelData(0);
     const downsampled = downsampleBuffer(
       channelData,

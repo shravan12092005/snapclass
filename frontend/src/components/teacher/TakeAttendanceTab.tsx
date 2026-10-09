@@ -13,17 +13,80 @@ import {
   AlertCircle,
   Video,
   HelpCircle,
+  CheckCircle2,
 } from "lucide-react";
 import AttendanceReviewModal from "./AttendanceReviewModal";
 import ProcessingOverlay from "@/components/ProcessingOverlay";
 import { useProcessing } from "@/hooks/useProcessing";
-import { scaleImageFile } from "@/lib/imageUtils";
+import { scaleImageFile, dataUrlToBlob } from "@/lib/imageUtils";
 import { getSupportedAudioMimeType, convertBlobToWav } from "@/lib/audioUtils";
 
 interface TakeAttendanceTabProps {
   subjects: Subject[];
   onNavigateToSubjects: () => void;
   onAttendanceSaved: () => void;
+}
+
+function StagedPhotoThumbnail({
+  file,
+  index,
+  isProcessing,
+  onRemove,
+}: {
+  file: File | Blob;
+  index: number;
+  isProcessing: boolean;
+  onRemove: (idx: number) => void;
+}) {
+  const [previewUrl, setPreviewUrl] = useState<string>("");
+
+  useEffect(() => {
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    return () => {
+      URL.revokeObjectURL(url);
+    };
+  }, [file]);
+
+  const size = (file as File).size || (file as Blob).size || 0;
+  const sizeStr =
+    size > 1024 * 1024
+      ? `${(size / (1024 * 1024)).toFixed(1)} MB`
+      : `${Math.round(size / 1024)} KB`;
+
+  return (
+    <div className="group relative rounded-xl border border-[#E2E8F0] overflow-hidden bg-[#F8FAFC] aspect-square">
+      {previewUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={previewUrl}
+          alt={`Classroom photo ${index + 1}`}
+          className="w-full h-full object-cover"
+        />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center bg-slate-100">
+          <span className="text-xs text-slate-400">Loading…</span>
+        </div>
+      )}
+      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-2">
+        <button
+          type="button"
+          onClick={() => onRemove(index)}
+          disabled={isProcessing}
+          className="p-1.5 rounded-lg bg-white/90 text-[#B91C1C] hover:bg-white transition-colors"
+          title="Remove photo"
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      </div>
+      <div className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/60 text-white text-[10px] font-medium">
+        #{index + 1}
+      </div>
+      <div className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-black/60 text-white text-[10px] font-mono">
+        {sizeStr}
+      </div>
+    </div>
+  );
 }
 
 export default function TakeAttendanceTab({
@@ -46,6 +109,10 @@ export default function TakeAttendanceTab({
   );
   const [stagedPhotos, setStagedPhotos] = useState<File[]>([]);
   const [cameraActive, setCameraActive] = useState(false);
+  const [videoReady, setVideoReady] = useState(false);
+  const [shutterFlash, setShutterFlash] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
@@ -59,6 +126,15 @@ export default function TakeAttendanceTab({
       setPhotoInputType("camera");
     }
   }, [searchParams]);
+
+  // Keep video.srcObject synced whenever stream or mode changes
+  useEffect(() => {
+    if (photoInputType === "camera" && videoRef.current && streamRef.current) {
+      if (videoRef.current.srcObject !== streamRef.current) {
+        videoRef.current.srcObject = streamRef.current;
+      }
+    }
+  }, [photoInputType, cameraActive]);
 
   // Voice Scan State
   const [isRecording, setIsRecording] = useState(false);
@@ -110,48 +186,160 @@ export default function TakeAttendanceTab({
       streamRef.current = null;
     }
     setCameraActive(false);
+    setVideoReady(false);
   };
 
   const startCameraStream = async () => {
     setErrorMsg("");
+    setVideoReady(false);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
-      });
+      const constraints: MediaStreamConstraints = {
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: { ideal: "environment" },
+        },
+        audio: false,
+      };
+
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+      } catch (constraintErr) {
+        // Fallback for Safari on Mac (which throws OverconstrainedError on environment facingMode)
+        console.warn("Retrying with simple video constraint for Safari:", constraintErr);
+        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      }
+
       streamRef.current = stream;
       if (videoRef.current) {
-        videoRef.current.srcObject = stream;
+        const v = videoRef.current;
+        v.srcObject = stream;
+        v.setAttribute("playsinline", "true");
+        v.setAttribute("webkit-playsinline", "true");
+        v.muted = true;
+        v.play().catch(() => {});
       }
       setCameraActive(true);
     } catch {
-      setErrorMsg("Camera access denied or unavailable. Please check browser permissions.");
+      setErrorMsg("Camera access denied or unavailable in this browser. Please check camera permissions.");
       setCameraActive(false);
+      setVideoReady(false);
+    }
+  };
+
+  const attachVideo = (el: HTMLVideoElement | null) => {
+    videoRef.current = el;
+    if (el && streamRef.current) {
+      el.srcObject = streamRef.current;
+      el.setAttribute("playsinline", "true");
+      el.setAttribute("webkit-playsinline", "true");
+      el.muted = true;
+      el.play().catch(() => {});
     }
   };
 
   const captureCameraPhoto = () => {
-    if (!videoRef.current) return;
+    if (!videoRef.current) {
+      setErrorMsg("Camera is not ready. Please restart the video stream.");
+      return;
+    }
+    const video = videoRef.current;
+    const width = video.videoWidth || 1280;
+    const height = video.videoHeight || 720;
+    if (width === 0 || height === 0) {
+      setErrorMsg("Camera stream is still initializing. Please wait a moment.");
+      return;
+    }
+
     const canvas = document.createElement("canvas");
-    canvas.width = videoRef.current.videoWidth || 640;
-    canvas.height = videoRef.current.videoHeight || 480;
+    canvas.width = width;
+    canvas.height = height;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+    ctx.drawImage(video, 0, 0, width, height);
 
-    canvas.toBlob((blob) => {
-      if (blob) {
-        const file = new File([blob], `cam_snap_${Date.now()}.jpg`, { type: "image/jpeg" });
-        setStagedPhotos((prev) => [...prev, file]);
+    // Trigger visual shutter flash
+    setShutterFlash(true);
+    setTimeout(() => setShutterFlash(false), 200);
+
+    const filename = `cam_snap_${Date.now()}.jpg`;
+    try {
+      // Synchronous toDataURL + dataUrlToBlob ensures 100% Safari/WebKit compatibility
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+      const blob = dataUrlToBlob(dataUrl);
+      let file: File | Blob = blob;
+      try {
+        file = new File([blob], filename, { type: "image/jpeg" });
+      } catch {
+        (blob as any).name = filename;
+        file = blob;
       }
-    }, "image/jpeg", 0.92);
+      setStagedPhotos((prev) => [...prev, file as File]);
+      setErrorMsg("");
+    } catch {
+      // Fallback to toBlob if toDataURL fails
+      canvas.toBlob(
+        (blob) => {
+          if (blob) {
+            let file: File | Blob = blob;
+            try {
+              file = new File([blob], filename, { type: "image/jpeg" });
+            } catch {
+              (blob as any).name = filename;
+              file = blob;
+            }
+            setStagedPhotos((prev) => [...prev, file as File]);
+            setErrorMsg("");
+          } else {
+            setErrorMsg("Failed to capture snapshot frame from camera.");
+          }
+        },
+        "image/jpeg",
+        0.92
+      );
+    }
   };
 
-  // Photo file uploads
+  // Photo file uploads (file picker)
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
     const newFiles = Array.from(e.target.files);
-    setStagedPhotos((prev) => [...prev, ...newFiles]);
+    if (newFiles.length > 0) {
+      setStagedPhotos((prev) => [...prev, ...newFiles]);
+      setErrorMsg("");
+    }
     e.target.value = "";
+  };
+
+  // Drag and drop handlers
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
+      const dropped = Array.from(e.dataTransfer.files).filter((f) =>
+        f.type.startsWith("image/") || /\.(jpe?g|png|webp|heic)$/i.test(f.name)
+      );
+      if (dropped.length > 0) {
+        setStagedPhotos((prev) => [...prev, ...dropped]);
+        setErrorMsg("");
+      } else {
+        setErrorMsg("Please drop valid image files (JPEG, PNG, WebP).");
+      }
+    }
   };
 
   const removePhoto = (index: number) => {
@@ -406,6 +594,24 @@ export default function TakeAttendanceTab({
         )}
       </div>
 
+      {currentSubject && currentSubject.total_students === 0 && (
+        <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
+            <span>
+              <strong>No students enrolled yet</strong> in this course. Share the course code with students to join before scanning attendance.
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={onNavigateToSubjects}
+            className="text-xs font-bold text-amber-800 hover:underline shrink-0"
+          >
+            Manage Course &rarr;
+          </button>
+        </div>
+      )}
+
       {/* Flattened Mode Selection: Single Clear Choice */}
       <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-xs overflow-hidden relative">
         {/* Processing Feedback Overlay */}
@@ -508,40 +714,72 @@ export default function TakeAttendanceTab({
               </button>
             </div>
 
-            {/* Upload Area */}
+            {/* Upload Area with Full Drag-and-Drop and Native Click */}
             {photoInputType === "upload" && (
-              <label className="border-2 border-dashed border-[#CBD5E1] hover:border-[#4F46E5] rounded-2xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-colors bg-[#F8FAFC]">
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => fileInputRef.current?.click()}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    fileInputRef.current?.click();
+                  }
+                }}
+                onDragOver={handleDragOver}
+                onDragEnter={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                className={`border-2 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-all ${
+                  isDragging
+                    ? "border-[#4F46E5] bg-[#EEF2FF] ring-4 ring-[#C7D2FE]"
+                    : "border-[#CBD5E1] hover:border-[#4F46E5] bg-[#F8FAFC]"
+                }`}
+              >
                 <div className="h-12 w-12 rounded-xl bg-[#EEF2FF] text-[#4F46E5] flex items-center justify-center mb-3">
                   <Upload className="h-6 w-6" />
                 </div>
-                <div className="text-sm font-bold text-[#0F172A]">Click or drag classroom photos here</div>
-                <p className="text-xs text-[#64748B] mt-1">Supports multi-photo selection (JPEG, PNG up to 10 MB each)</p>
+                <div className="text-sm font-bold text-[#0F172A]">
+                  {isDragging ? "Drop classroom photos now!" : "Click or drag classroom photos here"}
+                </div>
+                <p className="text-xs text-[#64748B] mt-1">Supports multi-photo selection (JPEG, PNG, WebP up to 10 MB each)</p>
                 <input
+                  ref={fileInputRef}
                   type="file"
                   multiple
-                  accept="image/jpeg,image/png,image/jpg"
+                  accept="image/*,image/jpeg,image/png,image/webp,image/heic"
                   onChange={handlePhotoUpload}
+                  onClick={(e) => e.stopPropagation()}
                   className="hidden"
                 />
-              </label>
+              </div>
             )}
 
             {/* Live Camera Area */}
             {photoInputType === "camera" && (
               <div className="bg-[#0F172A] rounded-2xl p-4 flex flex-col items-center justify-center relative overflow-hidden">
+                {shutterFlash && (
+                  <div className="absolute inset-0 bg-white opacity-80 pointer-events-none transition-opacity duration-200 z-10" />
+                )}
                 <video
-                  ref={videoRef}
+                  ref={attachVideo}
+                  onLoadedMetadata={(e) => {
+                    (e.target as HTMLVideoElement).play().catch(() => {});
+                    setVideoReady(true);
+                  }}
+                  onCanPlay={() => setVideoReady(true)}
+                  onLoadedData={() => setVideoReady(true)}
                   autoPlay
                   playsInline
                   muted
                   className="w-full max-w-lg rounded-xl aspect-4/3 object-cover bg-black"
                 />
-                <div className="mt-4 flex items-center gap-3">
+                <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
                   <button
                     type="button"
                     onClick={captureCameraPhoto}
-                    disabled={!cameraActive}
-                    className="px-6 py-2.5 rounded-xl bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-bold shadow-xs transition-colors flex items-center gap-2"
+                    disabled={!cameraActive || !videoReady}
+                    className="px-6 py-2.5 rounded-xl bg-[#4F46E5] hover:bg-[#4338CA] disabled:bg-[#94A3B8] disabled:cursor-not-allowed text-white text-xs font-bold shadow-xs transition-colors flex items-center gap-2"
                   >
                     <Camera className="h-4 w-4" />
                     <span>Take Classroom Snapshot</span>
@@ -554,7 +792,34 @@ export default function TakeAttendanceTab({
                   >
                     <RefreshCw className="h-4 w-4" />
                   </button>
+                  {stagedPhotos.length > 0 && (
+                    <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold flex items-center gap-1.5">
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      {stagedPhotos.length} {stagedPhotos.length === 1 ? "photo" : "photos"} staged
+                    </span>
+                  )}
                 </div>
+              </div>
+            )}
+
+            {/* Quick Action Banner When Photos Are Staged */}
+            {stagedPhotos.length > 0 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 rounded-xl bg-[#EEF2FF] border border-[#C7D2FE]">
+                <div className="flex items-center gap-2 text-xs text-[#1E293B]">
+                  <CheckCircle2 className="h-4 w-4 text-[#4F46E5]" />
+                  <span>
+                    <strong className="text-[#0F172A]">{stagedPhotos.length} {stagedPhotos.length === 1 ? "photo ready" : "photos ready"}</strong> &mdash; scan faces against the course roster.
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRunAnalysis}
+                  disabled={isProcessing}
+                  className="w-full sm:w-auto px-4 py-2 rounded-lg bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-bold shadow-xs transition-colors flex items-center justify-center gap-1.5"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  <span>Run Face Analysis ({stagedPhotos.length})</span>
+                </button>
               </div>
             )}
 
@@ -580,43 +845,15 @@ export default function TakeAttendanceTab({
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
-                  {stagedPhotos.map((file, idx) => {
-                    const objectUrl = URL.createObjectURL(file);
-                    const sizeStr =
-                      file.size > 1024 * 1024
-                        ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
-                        : `${Math.round(file.size / 1024)} KB`;
-                    return (
-                      <div
-                        key={idx}
-                        className="group relative rounded-xl border border-[#E2E8F0] overflow-hidden bg-[#F8FAFC] aspect-square"
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={objectUrl}
-                          alt={`Photo ${idx + 1}`}
-                          className="w-full h-full object-cover"
-                        />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-2">
-                          <button
-                            type="button"
-                            onClick={() => removePhoto(idx)}
-                            disabled={isProcessing}
-                            className="p-1.5 rounded-lg bg-white/90 text-[#B91C1C] hover:bg-white transition-colors"
-                            title="Remove photo"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                        <div className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/60 text-white text-[10px] font-medium">
-                          #{idx + 1}
-                        </div>
-                        <div className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-black/60 text-white text-[10px] font-mono">
-                          {sizeStr}
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {stagedPhotos.map((file, idx) => (
+                    <StagedPhotoThumbnail
+                      key={`${idx}-${(file as File).name || "photo"}-${file.size}`}
+                      file={file}
+                      index={idx}
+                      isProcessing={isProcessing}
+                      onRemove={removePhoto}
+                    />
+                  ))}
                 </div>
               </div>
             )}

@@ -9,6 +9,7 @@ import React, {
   forwardRef,
 } from "react";
 import { Camera, RefreshCw, Upload, AlertCircle, CheckCircle2 } from "lucide-react";
+import { dataUrlToBlob } from "@/lib/imageUtils";
 
 export interface CameraCaptureHandle {
   reset: () => void;
@@ -68,14 +69,21 @@ const CameraCapture = forwardRef<CameraCaptureHandle, CameraCaptureProps>(
           throw new Error("Camera API is not supported in this browser environment.");
         }
 
-        const mediaStream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-            facingMode: "user",
-          },
-          audio: false,
-        });
+        let mediaStream: MediaStream;
+        try {
+          mediaStream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+              facingMode: { ideal: "user" },
+            },
+            audio: false,
+          });
+        } catch (constraintErr) {
+          // Fallback for Safari/browsers with stricter constraints
+          console.warn("Retrying with simple video constraint for Safari:", constraintErr);
+          mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        }
 
         // If photo already set while resolving, immediately stop stream
         if (capturedUrl) {
@@ -85,7 +93,12 @@ const CameraCapture = forwardRef<CameraCaptureHandle, CameraCaptureProps>(
 
         streamRef.current = mediaStream;
         if (videoRef.current) {
-          videoRef.current.srcObject = mediaStream;
+          const v = videoRef.current;
+          v.srcObject = mediaStream;
+          v.setAttribute("playsinline", "true");
+          v.setAttribute("webkit-playsinline", "true");
+          v.muted = true;
+          v.play().catch(() => {});
         }
       } catch (err: any) {
         console.warn("Camera access failed:", err);
@@ -131,6 +144,10 @@ const CameraCapture = forwardRef<CameraCaptureHandle, CameraCaptureProps>(
       videoRef.current = el;
       if (el && streamRef.current) {
         el.srcObject = streamRef.current;
+        el.setAttribute("playsinline", "true");
+        el.setAttribute("webkit-playsinline", "true");
+        el.muted = true;
+        el.play().catch(() => {});
       }
     }, []);
 
@@ -171,17 +188,25 @@ const CameraCapture = forwardRef<CameraCaptureHandle, CameraCaptureProps>(
       // Draw current video frame
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-      canvas.toBlob(
-        (blob) => {
-          if (blob) {
-            const url = URL.createObjectURL(blob);
-            setCapturedUrl(url);
-            onCapture(blob);
-          }
-        },
-        "image/jpeg",
-        0.95
-      );
+      try {
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.95);
+        const blob = dataUrlToBlob(dataUrl);
+        const url = URL.createObjectURL(blob);
+        setCapturedUrl(url);
+        onCapture(blob);
+      } catch {
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              const url = URL.createObjectURL(blob);
+              setCapturedUrl(url);
+              onCapture(blob);
+            }
+          },
+          "image/jpeg",
+          0.95
+        );
+      }
     };
 
     // ── File upload fallback ──────────────────────────────────────────────
@@ -210,9 +235,10 @@ const CameraCapture = forwardRef<CameraCaptureHandle, CameraCaptureProps>(
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/jpeg,image/png"
+          accept="image/*,image/jpeg,image/png,image/webp,image/heic"
           className="hidden"
           onChange={handleFileUpload}
+          onClick={(e) => e.stopPropagation()}
         />
 
         {/* Header Info */}
@@ -241,6 +267,11 @@ const CameraCapture = forwardRef<CameraCaptureHandle, CameraCaptureProps>(
                 autoPlay
                 playsInline
                 muted
+                onLoadedMetadata={(e) => {
+                  (e.target as HTMLVideoElement).play().catch(() => {});
+                  setVideoReady(true);
+                }}
+                onCanPlay={() => setVideoReady(true)}
                 onLoadedData={() => setVideoReady(true)}
                 className="w-full h-full object-cover transform -scale-x-100"
               />
