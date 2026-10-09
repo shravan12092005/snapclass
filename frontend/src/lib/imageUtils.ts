@@ -106,3 +106,86 @@ export async function scaleImageFile(file: File, maxDim: number = 1280): Promise
     lastModified: Date.now(),
   });
 }
+
+export function dataUrlToBlob(dataUrl: string): Blob {
+  const parts = dataUrl.split(",");
+  const mimeMatch = parts[0].match(/:(.*?);/);
+  const mime = mimeMatch ? mimeMatch[1] : "image/jpeg";
+  const byteString = atob(parts[1]);
+  const ab = new ArrayBuffer(byteString.length);
+  const ia = new Uint8Array(ab);
+  for (let i = 0; i < byteString.length; i++) {
+    ia[i] = byteString.charCodeAt(i);
+  }
+  return new Blob([ab], { type: mime });
+}
+
+export function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+      } else {
+        reject(new Error("Failed to convert Blob to Data URL"));
+      }
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+export const PENDING_FACE_KEY = "snapclass_pending_face";
+export const PENDING_FACE_MAX_AGE_MS = 10 * 60 * 1000;
+
+export interface PendingFaceData {
+  dataUrl: string;
+  savedAt: number;
+}
+
+export function savePendingFace(dataUrl: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(
+      PENDING_FACE_KEY,
+      JSON.stringify({
+        dataUrl,
+        savedAt: Date.now(),
+      })
+    );
+  } catch (err) {
+    console.warn("Failed to save pending face to sessionStorage:", err);
+  }
+}
+
+export function getPendingFace(): Blob | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const stored = sessionStorage.getItem(PENDING_FACE_KEY);
+    if (!stored) return null;
+    sessionStorage.removeItem(PENDING_FACE_KEY);
+    const parsed: PendingFaceData = JSON.parse(stored);
+    if (
+      parsed &&
+      typeof parsed.dataUrl === "string" &&
+      typeof parsed.savedAt === "number" &&
+      Date.now() - parsed.savedAt < PENDING_FACE_MAX_AGE_MS
+    ) {
+      return dataUrlToBlob(parsed.dataUrl);
+    }
+  } catch (err) {
+    console.warn("Failed to load pending face from sessionStorage:", err);
+    try {
+      sessionStorage.removeItem(PENDING_FACE_KEY);
+    } catch {}
+  }
+  return null;
+}
+
+export function clearPendingFace(): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.removeItem(PENDING_FACE_KEY);
+  } catch {}
+}
+

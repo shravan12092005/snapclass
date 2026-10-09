@@ -1,13 +1,14 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { useToast } from "@/context/ToastContext";
 import { api, ApiError } from "@/lib/api";
-import CameraCapture from "@/components/CameraCapture";
+import CameraCapture, { CameraCaptureHandle } from "@/components/CameraCapture";
 import ProcessingOverlay from "@/components/ProcessingOverlay";
 import { useProcessing } from "@/hooks/useProcessing";
-import { scaleImageBlob } from "@/lib/imageUtils";
+import { scaleImageBlob, blobToDataUrl, savePendingFace, clearPendingFace } from "@/lib/imageUtils";
 import {
   UserCheck,
   AlertCircle,
@@ -19,10 +20,22 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
+function isNotRecognizedFace(message?: string): boolean {
+  if (!message) return false;
+  const lower = message.toLowerCase();
+  // Do NOT match if distinguishable case where no students are enrolled
+  if (lower.includes("no registered students") || lower.includes("no students")) {
+    return false;
+  }
+  return lower.includes("face not recognized") || lower.includes("not recognized");
+}
+
 export default function StudentFaceLoginPage() {
   const router = useRouter();
   const { refreshAuth } = useAuth();
+  const { showToast } = useToast();
 
+  const cameraRef = useRef<CameraCaptureHandle>(null);
   const [capturedBlob, setCapturedBlob] = useState<Blob | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [lockoutRemaining, setLockoutRemaining] = useState<number | null>(null);
@@ -72,6 +85,8 @@ export default function StudentFaceLoginPage() {
     setCapturedBlob(null);
     setError(null);
     setIsServiceDown(false);
+    clearPendingFace();
+    cameraRef.current?.reset();
   };
 
   // Step 2: User clicks "Sign in" manually
@@ -97,9 +112,10 @@ export default function StudentFaceLoginPage() {
       onRetry: handleSignIn,
     });
 
+    let scaledBlob: Blob | null = null;
     try {
       // Downscale photo client-side before sending to server (max 960px)
-      const scaledBlob = await scaleImageBlob(capturedBlob, 960);
+      scaledBlob = await scaleImageBlob(capturedBlob, 960);
 
       const res = await api.loginStudentFace(scaledBlob, {
         signal,
@@ -107,6 +123,7 @@ export default function StudentFaceLoginPage() {
       });
 
       const studentName = res.user?.name || "Student";
+      clearPendingFace();
       await showSuccess(`Welcome back, ${studentName}`, 600);
       await refreshAuth();
       router.push("/student");
@@ -125,6 +142,18 @@ export default function StudentFaceLoginPage() {
           const seconds = match ? parseInt(match[1], 10) : 60;
           setLockoutRemaining(seconds);
           setError(`Too many failed attempts. Device is locked out for ${seconds} seconds.`);
+        } else if (err.status === 401 && isNotRecognizedFace(err.message)) {
+          // Hand-off: Save photo to sessionStorage and redirect to /student/register
+          try {
+            const blobToStore = scaledBlob || capturedBlob;
+            const dataUrl = await blobToDataUrl(blobToStore);
+            savePendingFace(dataUrl);
+          } catch (storageErr) {
+            console.warn("Failed to store pending face in sessionStorage:", storageErr);
+          }
+          showToast("No profile found for this face. Let's create one.", "info");
+          router.push("/student/register");
+          return;
         } else {
           setError(err.message);
         }
@@ -206,7 +235,9 @@ export default function StudentFaceLoginPage() {
         {/* Camera Component */}
         <div className="relative">
           <CameraCapture
+            ref={cameraRef}
             onCapture={handleFaceCapture}
+            hideRetakeButton={true}
             title=""
             subtitle=""
           />

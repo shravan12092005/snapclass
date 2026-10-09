@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { api, ApiError } from "@/lib/api";
@@ -8,7 +8,7 @@ import CameraCapture from "@/components/CameraCapture";
 import VoiceRecorder from "@/components/VoiceRecorder";
 import ProcessingOverlay from "@/components/ProcessingOverlay";
 import { useProcessing } from "@/hooks/useProcessing";
-import { scaleImageBlob } from "@/lib/imageUtils";
+import { scaleImageBlob, getPendingFace, clearPendingFace } from "@/lib/imageUtils";
 import {
   UserPlus,
   AlertCircle,
@@ -24,10 +24,19 @@ export default function StudentRegisterPage() {
 
   const [name, setName] = useState("");
   const [consent, setConsent] = useState(false);
-  const [faceBlob, setFaceBlob] = useState<Blob | null>(null);
   const [voiceBlob, setVoiceBlob] = useState<Blob | null>(null);
 
+  // Initialize faceBlob from pending face hand-off if present and fresh (< 10 mins)
+  const [faceBlob, setFaceBlob] = useState<Blob | null>(() => getPendingFace());
+
   const [error, setError] = useState<string | null>(null);
+
+  // Clean-up key on leaving register page without submitting
+  useEffect(() => {
+    return () => {
+      clearPendingFace();
+    };
+  }, []);
 
   const {
     isProcessing,
@@ -85,6 +94,8 @@ export default function StudentRegisterPage() {
         signal,
         onProgress: (pct) => setUploadPercent(pct),
       });
+
+      clearPendingFace();
 
       await showSuccess(res.message || "Profile successfully created!", 800);
       await refreshAuth();
@@ -168,7 +179,12 @@ export default function StudentRegisterPage() {
               </span>
             </div>
             <CameraCapture
+              initialBlob={faceBlob}
               onCapture={(blob) => setFaceBlob(blob)}
+              onRetake={() => {
+                setFaceBlob(null);
+                clearPendingFace();
+              }}
               title=""
               subtitle="Capture your face in the oval guide for AI attendance recognition"
             />
