@@ -126,9 +126,13 @@ node_modules/
 out/
 
 # Secrets & sensitive files
-.streamlit/secrets.toml
+.env
+.env.*
+!.env.example
 backend/.env
 frontend/.env.local
+.streamlit/secrets.toml
 *.log
 backend/snapclass.log
 snapclass.log
+
