@@ -1,7 +1,10 @@
+import os
 import numpy as np 
 import io
 import streamlit as st
 from src.utils.logger import logger
+
+DEFAULT_VOICE_THRESHOLD = float(os.getenv("VOICE_SIMILARITY_THRESHOLD", "0.58"))
 
 try:
     from resemblyzer import VoiceEncoder, preprocess_wav
@@ -37,7 +40,9 @@ def get_voice_embedding(audio_bytes):
         return None
     
 
-def identify_speaker(new_embedding, candidates_dict, threshold=0.65):
+def identify_speaker(new_embedding, candidates_dict, threshold=None):
+    if threshold is None:
+        threshold = DEFAULT_VOICE_THRESHOLD
     if new_embedding is None or not candidates_dict:
         return None, 0.0
     
@@ -58,7 +63,7 @@ def identify_speaker(new_embedding, candidates_dict, threshold=0.65):
             if stored_norm > 1e-8:
                 stored_emb_np = stored_emb_np / stored_norm
 
-            similarity = np.dot(new_emb_np, stored_emb_np)
+            similarity = float(np.dot(new_emb_np, stored_emb_np))
             if similarity > best_score:
                 best_score = similarity
                 best_sid = sid
@@ -70,7 +75,10 @@ def identify_speaker(new_embedding, candidates_dict, threshold=0.65):
 
 
 
-def process_bulk_audio(audio_bytes, candidates_dict, threshold=0.65):
+def process_bulk_audio(audio_bytes, candidates_dict, threshold=None):
+    if threshold is None:
+        threshold = DEFAULT_VOICE_THRESHOLD
+
     if not VOICE_AVAILABLE:
         st.error("Voice recognition is unavailable (resemblyzer or librosa packages are not installed).")
         return {}
@@ -78,26 +86,51 @@ def process_bulk_audio(audio_bytes, candidates_dict, threshold=0.65):
         encoder = load_voice_encoder()
 
         audio, sr = librosa.load(io.BytesIO(audio_bytes), sr=16000)
-        segments = librosa.effects.split(audio, top_db=30)
+        duration = len(audio) / sr if sr > 0 else 0.0
+        peak_amp = float(np.max(np.abs(audio))) if len(audio) > 0 else 0.0
+
+        logger.info(
+            f"[voice_pipeline] Audio received: {duration:.2f}s, peak_amp={peak_amp:.4f}, "
+            f"{len(candidates_dict)} candidate(s) (IDs: {list(candidates_dict.keys())}), threshold={threshold:.2f}"
+        )
+
+        if duration < 0.2:
+            logger.warning("[voice_pipeline] Audio duration is too short (< 0.2s).")
+            return {}
+
+        # 1. Voice activity segmentation using top_db=40 (more forgiving than 30)
+        segments = librosa.effects.split(audio, top_db=40)
+        # Keep segments >= 250ms (captures 'Here', 'Present', names)
+        valid_segments = [s for s in segments if (s[1] - s[0]) >= sr * 0.25]
+
+        # 2. If silence splitting returned no valid segments, fallback to analyzing full clip
+        if not valid_segments:
+            logger.info("[voice_pipeline] No distinct split segments >= 0.25s; evaluating full audio clip.")
+            valid_segments = [(0, len(audio))]
 
         identified_results = {}
 
-
-        for start, end in segments:
-
-            if (end-start) < sr * 0.5:
-                continue
+        for idx, (start, end) in enumerate(valid_segments):
+            seg_len = (end - start) / sr
             segment_audio = audio[start:end]
             wav = preprocess_wav(segment_audio)
+            if len(wav) < 160:
+                continue
+
             embedding = encoder.embed_utterance(wav)
-
-
             sid, score = identify_speaker(embedding, candidates_dict, threshold)
+
+            logger.info(
+                f"[voice_pipeline] Segment {idx+1}/{len(valid_segments)} "
+                f"({start/sr:.2f}s - {end/sr:.2f}s, len={seg_len:.2f}s): "
+                f"best_sid={sid}, similarity={score:.4f} (threshold={threshold:.2f})"
+            )
 
             if sid:
                 if sid not in identified_results or score > identified_results[sid]:
                     identified_results[sid] = score
 
+        logger.info(f"[voice_pipeline] Identified results: {identified_results}")
         return identified_results
     except Exception as e:
         import traceback
