@@ -54,6 +54,8 @@ async function fetchJson<T>(url: string, options: RequestInit = {}): Promise<T> 
 export interface UploadOptions {
   signal?: AbortSignal;
   onProgress?: (percent: number) => void;
+  /** XHR timeout in milliseconds (0 = no timeout) */
+  timeoutMs?: number;
 }
 
 function uploadWithProgress<T>(
@@ -66,6 +68,11 @@ function uploadWithProgress<T>(
     xhr.open("POST", url, true);
     xhr.withCredentials = true;
     xhr.setRequestHeader("Accept", "application/json");
+
+    // Apply timeout if specified (voice scan needs ~120s on Render free tier)
+    if (options.timeoutMs && options.timeoutMs > 0) {
+      xhr.timeout = options.timeoutMs;
+    }
 
     if (options.signal) {
       if (options.signal.aborted) {
@@ -120,11 +127,28 @@ function uploadWithProgress<T>(
     };
 
     xhr.ontimeout = () => {
-      reject(new ApiError("Request timed out.", 408));
+      reject(
+        new ApiError(
+          "Voice recognition timed out. The server may be starting up — please try again in 30 seconds.",
+          408
+        )
+      );
     };
 
     xhr.send(formData);
   });
+}
+
+/**
+ * Fire-and-forget health ping to wake the Render free-tier backend before a heavy request.
+ * Safe to call without awaiting — errors are silently swallowed.
+ */
+export async function pingBackend(): Promise<void> {
+  try {
+    await fetch("/api/health", { credentials: "include" });
+  } catch {
+    // Intentionally ignored — best-effort warm-up
+  }
 }
 
 export const api = {
@@ -297,7 +321,7 @@ export const api = {
     return uploadWithProgress<VoiceAttendanceResponse>(
       `/api/attendance/voice?subject_id=${subjectId}`,
       formData,
-      options
+      { timeoutMs: 120_000, ...options }
     );
   },
 

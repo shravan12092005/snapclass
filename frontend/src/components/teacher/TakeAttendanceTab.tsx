@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { Subject, AttendanceResultEntry, AttendanceLogEntry } from "@/types";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, pingBackend } from "@/lib/api";
 import {
   Camera,
   Mic,
@@ -119,6 +119,8 @@ export default function TakeAttendanceTab({
   useEffect(() => {
     if (searchParams.get("mode") === "voice") {
       setActiveMode("voice");
+      // Pre-warm backend (fire and forget) when landing in voice mode
+      pingBackend();
     } else if (searchParams.get("mode") === "face") {
       setActiveMode("face");
     }
@@ -362,6 +364,8 @@ export default function TakeAttendanceTab({
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Ping backend in parallel while user records — reduces perceived latency
+      pingBackend();
       const mime = getSupportedAudioMimeType();
       const recorder = mime
         ? new MediaRecorder(stream, { mimeType: mime })
@@ -493,9 +497,9 @@ export default function TakeAttendanceTab({
       const signal = startProcessing({
         title: "Processing Classroom Voice Roll Call",
         steps: [
-          "Uploading audio…",
-          "Converting audio…",
-          "Matching voices…",
+          "Uploading audio to server…",
+          "Analysing voice segments (may take 20–40s)…",
+          "Matching enrolled voices…",
         ],
         allowCancel: true,
         onRetry: handleRunAnalysis,
@@ -518,7 +522,11 @@ export default function TakeAttendanceTab({
           return;
         }
         if (err instanceof ApiError) {
-          if (err.status === 503) {
+          if (err.status === 408) {
+            setErrorMsg(
+              "Voice recognition timed out. The server may be waking up — wait 30 seconds and try again."
+            );
+          } else if (err.status === 503) {
             setErrorMsg("The voice biometric service is temporarily unavailable. Please try again in a moment.");
           } else {
             setErrorMsg(err.message);
@@ -649,7 +657,7 @@ export default function TakeAttendanceTab({
 
             <button
               type="button"
-              onClick={() => setActiveMode("voice")}
+              onClick={() => { setActiveMode("voice"); pingBackend(); }}
               className={`p-3 rounded-xl text-left transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5] ${
                 activeMode === "voice"
                   ? "bg-white text-[#4F46E5] shadow-xs border border-[#C7D2FE]"

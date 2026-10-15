@@ -1,6 +1,8 @@
 import os
+import time
 import numpy as np 
 import io
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from app.compat import st
 from app.services.logger import logger
 
@@ -74,6 +76,23 @@ def identify_speaker(new_embedding, candidates_dict, threshold=None):
     return None, best_score
 
 
+def _embed_segment(encoder, segment_audio, sr, idx, total, candidates_dict, threshold):
+    """Embed a single audio segment and return (idx, sid, score)."""
+    start_t = time.perf_counter()
+    wav = preprocess_wav(segment_audio)
+    if len(wav) < 160:
+        return idx, None, 0.0
+    embedding = encoder.embed_utterance(wav)
+    sid, score = identify_speaker(embedding, candidates_dict, threshold)
+    elapsed = time.perf_counter() - start_t
+    logger.info(
+        f"[voice_pipeline] Segment {idx+1}/{total} "
+        f"({len(segment_audio)/sr:.2f}s): "
+        f"best_sid={sid}, similarity={score:.4f} (threshold={threshold:.2f}), "
+        f"embed_time={elapsed:.2f}s"
+    )
+    return idx, sid, score
+
 
 def process_bulk_audio(audio_bytes, candidates_dict, threshold=None):
     if threshold is None:
@@ -83,15 +102,20 @@ def process_bulk_audio(audio_bytes, candidates_dict, threshold=None):
         st.error("Voice recognition is unavailable (resemblyzer or librosa packages are not installed).")
         return {}
     try:
+        t0 = time.perf_counter()
         encoder = load_voice_encoder()
+        t_encoder = time.perf_counter()
+        logger.info(f"[voice_pipeline] Encoder ready in {t_encoder - t0:.2f}s")
 
         audio, sr = librosa.load(io.BytesIO(audio_bytes), sr=16000)
+        t_load = time.perf_counter()
         duration = len(audio) / sr if sr > 0 else 0.0
         peak_amp = float(np.max(np.abs(audio))) if len(audio) > 0 else 0.0
 
         logger.info(
-            f"[voice_pipeline] Audio received: {duration:.2f}s, peak_amp={peak_amp:.4f}, "
-            f"{len(candidates_dict)} candidate(s) (IDs: {list(candidates_dict.keys())}), threshold={threshold:.2f}"
+            f"[voice_pipeline] Audio loaded: {duration:.2f}s, peak_amp={peak_amp:.4f}, "
+            f"{len(candidates_dict)} candidate(s) (IDs: {list(candidates_dict.keys())}), "
+            f"threshold={threshold:.2f}, load_time={t_load - t_encoder:.2f}s"
         )
 
         if duration < 0.2:
@@ -109,28 +133,40 @@ def process_bulk_audio(audio_bytes, candidates_dict, threshold=None):
             valid_segments = [(0, len(audio))]
 
         identified_results = {}
+        total = len(valid_segments)
 
-        for idx, (start, end) in enumerate(valid_segments):
-            seg_len = (end - start) / sr
-            segment_audio = audio[start:end]
-            wav = preprocess_wav(segment_audio)
-            if len(wav) < 160:
-                continue
+        # Use ThreadPoolExecutor for parallel segment embedding.
+        # resemblyzer's embed_utterance releases the GIL during NumPy ops,
+        # so threads give a real speedup on multi-segment recordings.
+        max_workers = min(total, os.cpu_count() or 2, 4)  # cap at 4 threads
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            futures = {
+                pool.submit(
+                    _embed_segment,
+                    encoder,
+                    audio[start:end],
+                    sr,
+                    idx,
+                    total,
+                    candidates_dict,
+                    threshold,
+                ): idx
+                for idx, (start, end) in enumerate(valid_segments)
+            }
+            for future in as_completed(futures):
+                try:
+                    seg_idx, sid, score = future.result()
+                    if sid:
+                        if sid not in identified_results or score > identified_results[sid]:
+                            identified_results[sid] = score
+                except Exception as exc:
+                    logger.error(f"[voice_pipeline] Segment {futures[future]+1} raised: {exc}")
 
-            embedding = encoder.embed_utterance(wav)
-            sid, score = identify_speaker(embedding, candidates_dict, threshold)
-
-            logger.info(
-                f"[voice_pipeline] Segment {idx+1}/{len(valid_segments)} "
-                f"({start/sr:.2f}s - {end/sr:.2f}s, len={seg_len:.2f}s): "
-                f"best_sid={sid}, similarity={score:.4f} (threshold={threshold:.2f})"
-            )
-
-            if sid:
-                if sid not in identified_results or score > identified_results[sid]:
-                    identified_results[sid] = score
-
-        logger.info(f"[voice_pipeline] Identified results: {identified_results}")
+        t_done = time.perf_counter()
+        logger.info(
+            f"[voice_pipeline] Identified results: {identified_results} "
+            f"| total_time={t_done - t0:.2f}s"
+        )
         return identified_results
     except Exception as e:
         import traceback
